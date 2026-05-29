@@ -996,6 +996,10 @@ let _syncStartTime  = 0;
    Bertahan selama session, tidak terpengaruh sync.
    PRIORITAS TERTINGGI dalam merge: lebih kuat dari Sheets maupun localStorage. */
 const _pendingDone = {};
+/* _deletedTxnIds: in-memory set ID transaksi yang sudah dihapus user session ini.
+   Mencegah syncFromSheets menarik kembali transaksi yang baru saja dihapus
+   (karena push ke Sheets mungkin belum selesai saat sync berikutnya berjalan). */
+const _deletedTxnIds = new Set();
 /* _syncErrCount: hitung berapa kali berturut-turut sync gagal.
    Tampilkan Sync Error HANYA setelah 2x gagal berturut — 1x gagal dianggap wajar (Apps Script lambat). */
 let _syncErrCount = 0;
@@ -1048,13 +1052,15 @@ async function syncFromSheets(){
        Transaksi lokal yang belum di Sheets → push semuanya ke Sheets (bulk replace).
        Ini memastikan cabang selalu bisa baca data dari Sheets, bukan hanya lokal. */
     if(txns !== null){
-      const sheetTxnIds  = new Set(txns.map(t=>String(t.id)));
+      /* Filter: jangan restore transaksi yang sudah dihapus user session ini */
+      const sheetTxnsFiltered = txns.filter(t => !_deletedTxnIds.has(t.id) && !_deletedTxnIds.has(String(t.id)));
+      const sheetTxnIds  = new Set(sheetTxnsFiltered.map(t=>String(t.id)));
       const localTxns    = _lsLoad('si_txns', []);
       const localNewTxns = localTxns.filter(t=>!sheetTxnIds.has(String(t.id)));
-      /* Gabungkan Sheets + transaksi lokal yang belum ada */
-      const mergedTxns = [...txns, ...localNewTxns];
+      /* Gabungkan Sheets (tanpa yang dihapus) + transaksi lokal yang belum ada */
+      const mergedTxns = [...sheetTxnsFiltered, ...localNewTxns];
       _lsSave('si_txns', mergedTxns);
-      /* Kalau ada transaksi lokal baru → kirim semua ke Sheets (setAllTxns = bulk replace) */
+      /* Kalau ada transaksi lokal baru → kirim semua ke Sheets */
       if(localNewTxns.length > 0) setTimeout(pushAllTxnsToSheets, 600);
     }
     if(targets !== null) _lsSave('si_targets', targets);
@@ -2806,8 +2812,9 @@ function renderHistTabel(txns){
 
 function deleteTxnFromHistory(id){
   if(!confirm('Hapus transaksi ini?'))return;
+  _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
   saveLS('si_txns',getTxns().filter(t=>t.id!==id));
-  pushAllTxnsToSheets(); /* bulk replace — lebih aman dari deleteTxn individual */
+  pushAllTxnsToSheets();
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi ID ${id}`});
   initFilters();refreshSales();
   renderHistory();
@@ -2938,6 +2945,8 @@ function txnBulkDelete(){
     addActivityLog({action:'delete_txn',txnId:id,desc:`Bulk hapus: ${t?t.customerName+' · '+idr(t.amount):'ID '+id}`});
   });
   txns=txns.filter(x=>!_txnSelected.has(x.id));
+  /* Catat semua ID yang dihapus agar sync tidak menarik balik dari Sheets */
+  _txnSelected.forEach(id=>{ _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); });
   saveLS('si_txns',txns);
   _txnSelected.clear();
   pushAllTxnsToSheets();
@@ -2986,6 +2995,7 @@ function saveEditTxn(){
 function deleteTxnById(id){
   if(!confirm('Hapus transaksi ini? Tindakan tidak bisa dibatalkan.'))return;
   const t=getTxns().find(x=>x.id===id);
+  _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); /* cegah sync balik */
   saveLS('si_txns',getTxns().filter(x=>x.id!==id));
   pushAllTxnsToSheets();
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi${t?` ${t.customerName} · ${idr(t.amount)}`:' ID '+id}`});
