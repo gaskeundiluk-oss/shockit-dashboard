@@ -704,16 +704,21 @@
 
 <!-- ══════ MODAL: DAFTAR TRANSAKSI (Master edit/hapus) ══════ -->
 <div class="modal-overlay" id="modal-txn-list" onclick="closeModalIf(event,'modal-txn-list')">
-  <div class="modal" style="max-width:700px">
-    <div class="modal-head">
+  <div class="modal" style="max-width:92vw;width:960px;max-height:92vh;display:flex;flex-direction:column">
+    <div class="modal-head" style="flex-shrink:0">
       <span class="modal-title">📋 Daftar Transaksi</span>
       <button class="modal-close" onclick="closeModal('modal-txn-list')">✕</button>
     </div>
-    <div class="modal-body" style="padding:12px 16px">
-      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <input class="form-input" id="txn-search" placeholder="🔍 Cari customer / produk / sales..." style="flex:1;font-size:12px" oninput="renderTxnList()"/>
+    <div class="modal-body" style="padding:12px 16px;flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <!-- Search + toolbar -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;flex-shrink:0">
+        <input class="form-input" id="txn-search" placeholder="🔍 Cari customer / produk / sales..." style="flex:1;font-size:12px;min-width:180px" oninput="renderTxnList()"/>
+        <button onclick="txnSelectAll()" style="padding:6px 12px;background:#0f3460;color:white;border:none;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer" title="Pilih semua yang terlihat">☑ Pilih Semua</button>
+        <button onclick="txnDeselectAll()" style="padding:6px 12px;background:#f4f6fb;color:#555;border:1px solid #ddd;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer">✕ Batal Pilih</button>
+        <button id="btn-bulk-del" onclick="txnBulkDelete()" style="padding:6px 14px;background:#c62828;color:white;border:none;border-radius:8px;font-size:11.5px;font-weight:700;cursor:pointer;display:none">🗑 Hapus Terpilih (<span id="sel-count">0</span>)</button>
       </div>
-      <div id="txn-list-wrap" style="max-height:420px;overflow-y:auto"></div>
+      <!-- List -->
+      <div id="txn-list-wrap" style="flex:1;overflow-y:auto;min-height:0"></div>
     </div>
   </div>
 </div>
@@ -2850,28 +2855,93 @@ function renderHistLog(f){
 /* ═══════════════════════════════════════════════
    EDIT & HAPUS TRANSAKSI (Master)
 ═══════════════════════════════════════════════ */
+/* _txnSelected: set of id yang sedang dipilih untuk bulk-delete */
+const _txnSelected = new Set();
+
 function renderTxnList(){
   const search=(document.getElementById('txn-search')?.value||'').toLowerCase();
-  const txns=getTxns().filter(t=>{
+  const allTxns=getTxns().filter(t=>{
     if(!search) return true;
     return t.customerName?.toLowerCase().includes(search)||t.salesName?.toLowerCase().includes(search)||t.productName?.toLowerCase().includes(search);
-  }).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
+  }).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
 
   const wrap=document.getElementById('txn-list-wrap');
-  if(!txns.length){wrap.innerHTML='<div class="empty-state">Tidak ada transaksi ditemukan.</div>';return}
-  wrap.innerHTML=`<table class="data-table" style="font-size:11.5px"><thead><tr><th>Tanggal</th><th>Sales</th><th>Customer</th><th>Produk</th><th>Qty</th><th>Amount</th><th>Aksi</th></tr></thead><tbody>`+
-    txns.map(t=>`<tr>
-      <td style="white-space:nowrap">${t.date}</td>
-      <td style="font-size:10.5px">${escH(t.salesName||'')}</td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.customerName||'')}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px">${escH(t.productName||'')}</td>
-      <td>${t.qty}</td>
-      <td style="white-space:nowrap;font-weight:700">${idr(t.amount)}</td>
-      <td><div class="txn-row-actions">
-        <button class="act-btn act-btn-edit" onclick="openEditTxn(${t.id})">✏️</button>
-        <button class="act-btn act-btn-del" onclick="deleteTxnById(${t.id})">🗑</button>
-      </div></td>
-    </tr>`).join('')+'</tbody></table>';
+  if(!allTxns.length){wrap.innerHTML='<div class="empty-state">Tidak ada transaksi ditemukan.</div>';_txnUpdateSelCount();return}
+
+  wrap.innerHTML=`
+  <table class="data-table" style="font-size:12px">
+    <thead>
+      <tr>
+        <th style="width:32px"><input type="checkbox" id="chk-all-txn" onchange="txnToggleAll(this.checked)" title="Pilih semua"></th>
+        <th>Tanggal</th><th>Sales</th><th>Customer</th><th>Produk</th><th style="text-align:center">Qty</th><th>Amount</th><th style="width:80px">Aksi</th>
+      </tr>
+    </thead>
+    <tbody>`+
+    allTxns.map(t=>`
+    <tr id="txnrow-${t.id}" style="${_txnSelected.has(t.id)?'background:#fff3f3':''}">
+      <td style="text-align:center">
+        <input type="checkbox" class="txn-chk" data-id="${t.id}" onchange="txnToggleOne(${t.id},this.checked)" ${_txnSelected.has(t.id)?'checked':''}>
+      </td>
+      <td style="white-space:nowrap;font-size:11px">${String(t.date).split('T')[0]}</td>
+      <td style="font-size:11px;white-space:nowrap">${escH(t.salesName||'')}</td>
+      <td style="font-size:11.5px">${escH(t.customerName||'')}</td>
+      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.productName||'')}</td>
+      <td style="text-align:center">${t.qty}</td>
+      <td style="white-space:nowrap;font-weight:700;color:#0f3460">${idr(t.amount)}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="act-btn act-btn-edit" onclick="openEditTxn(${t.id})" title="Edit">✏️</button>
+          <button class="act-btn act-btn-del" onclick="deleteTxnById(${t.id})" title="Hapus">🗑</button>
+        </div>
+      </td>
+    </tr>`).join('')+
+  '</tbody></table>';
+  _txnUpdateSelCount();
+}
+
+function txnToggleOne(id, checked){
+  if(checked) _txnSelected.add(id); else _txnSelected.delete(id);
+  const row=document.getElementById('txnrow-'+id);
+  if(row) row.style.background = checked?'#fff3f3':'';
+  _txnUpdateSelCount();
+}
+
+function txnToggleAll(checked){
+  document.querySelectorAll('.txn-chk').forEach(cb=>{
+    const id=parseInt(cb.dataset.id);
+    cb.checked=checked;
+    if(checked) _txnSelected.add(id); else _txnSelected.delete(id);
+    const row=document.getElementById('txnrow-'+id);
+    if(row) row.style.background=checked?'#fff3f3':'';
+  });
+  _txnUpdateSelCount();
+}
+
+function txnSelectAll(){ document.getElementById('chk-all-txn').checked=true; txnToggleAll(true); }
+function txnDeselectAll(){ _txnSelected.clear(); renderTxnList(); }
+
+function _txnUpdateSelCount(){
+  const n=_txnSelected.size;
+  const btn=document.getElementById('btn-bulk-del');
+  const cnt=document.getElementById('sel-count');
+  if(btn){ btn.style.display=n>0?'':'none'; }
+  if(cnt){ cnt.textContent=n; }
+}
+
+function txnBulkDelete(){
+  const n=_txnSelected.size;
+  if(!n) return;
+  if(!confirm(`Hapus ${n} transaksi yang dipilih? Tindakan tidak bisa dibatalkan.`)) return;
+  let txns=getTxns();
+  _txnSelected.forEach(id=>{
+    const t=txns.find(x=>x.id===id);
+    addActivityLog({action:'delete_txn',txnId:id,desc:`Bulk hapus: ${t?t.customerName+' · '+idr(t.amount):'ID '+id}`});
+  });
+  txns=txns.filter(x=>!_txnSelected.has(x.id));
+  saveLS('si_txns',txns);
+  _txnSelected.clear();
+  pushAllTxnsToSheets();
+  renderTxnList();initFilters();refreshSales();
 }
 
 function openEditTxn(id){
