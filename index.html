@@ -1,0 +1,3052 @@
+<!DOCTYPE html>
+<script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Sales Morning Briefing",
+  "schemaVersion": 1,
+  "description": "Dashboard SHOCK IT — tab Jadwal (to-do per divisi, plan besok, strategi minggu, follow-up customer) + tab Sales (pencapaian vs target, top 20 customer & produk, proyeksi hari kerja) + Catatan.",
+  "mcpTools": [
+    "mcp__7a406e96-840f-4501-99fe-93faecf2b49f__search_files",
+    "mcp__c17bfd5d-6c53-4fa8-b360-60925f481b26__list_events"
+  ],
+  "mcpServerNames": [
+    "Google Drive",
+    "Google Calendar"
+  ]
+}
+</script>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Sales Morning Briefing – SHOCK IT</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+  <style>
+    :root{color-scheme:light}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f4f6fb;color:#1a1a2e;min-height:100vh}
+
+    /* HEADER */
+    .header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 55%,#0f3460 100%);color:white;padding:20px 22px 18px}
+    .header-row{display:flex;justify-content:space-between;align-items:flex-start}
+    .greeting{font-size:19px;font-weight:700;margin-bottom:3px}
+    .date-line{font-size:11.5px;opacity:.65}
+    .brand-badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:5px 13px;font-size:11px;font-weight:700;letter-spacing:.6px}
+
+    /* MAIN TABS */
+    .main-tabs{display:flex;background:white;border-bottom:1px solid #e8e8ee;padding:0 16px;overflow-x:auto}
+    .main-tab{padding:12px 15px;font-size:12px;font-weight:600;color:#999;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color .2s,border-color .2s}
+    .main-tab.active{color:#0f3460;border-bottom-color:#0f3460}
+    .main-tab:hover:not(.active){color:#555}
+
+    .content{padding:16px}
+    .msection{display:none}
+    .msection.active{display:block}
+
+    /* SUB-TABS */
+    .sub-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+    .sub-tab{padding:7px 13px;font-size:11.5px;font-weight:600;border-radius:20px;cursor:pointer;border:1.5px solid #e0e0ea;color:#888;background:white;transition:all .2s;white-space:nowrap}
+    .sub-tab.active{background:#0f3460;border-color:#0f3460;color:white}
+    .sub-tab:hover:not(.active){border-color:#0f3460;color:#0f3460}
+    .sub-panel{display:none}
+    .sub-panel.active{display:block}
+
+    /* CARDS */
+    .card{background:white;border-radius:12px;padding:15px 17px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);border:1px solid #eeeef4}
+    .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .section-label{font-size:10.5px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.6px}
+
+    /* SALES FILTER BAR */
+    .sales-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;background:white;border-radius:12px;padding:12px 15px;border:1px solid #eeeef4;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+    .sf-group{display:flex;flex-direction:column;gap:4px;min-width:100px}
+    .sf-label{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px}
+    .sf-select{border:1px solid #e0e0ea;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;color:#1a1a2e;background:white;cursor:pointer}
+    .sf-select:focus{outline:none;border-color:#0f3460}
+    .sf-btn{padding:7px 14px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .2s}
+    .sf-btn-primary{background:#0f3460;color:white}
+    .sf-btn-primary:hover{background:#16213e}
+    .sf-btn-secondary{background:#f4f6fb;color:#0f3460;border:1px solid #d0d8e8}
+    .sf-btn-secondary:hover{background:#0f3460;color:white}
+    .sf-spacer{flex:1}
+
+    /* SUMMARY STRIP */
+    .sum-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+    .sum-card{background:white;border-radius:12px;padding:14px 12px;border:1px solid #eeeef4;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    .sum-main{font-size:18px;font-weight:700;color:#0f3460;margin-bottom:2px}
+    .sum-sub{font-size:10.5px;color:#aaa}
+    .sum-pct{font-size:13px;font-weight:700;margin-top:5px}
+    .pct-good{color:#2e7d32}
+    .pct-warn{color:#f57f17}
+    .pct-bad{color:#c62828}
+
+    /* PROGRESS BAR */
+    .prog-wrap{margin-top:7px}
+    .prog-bar{height:5px;background:#f0f0f6;border-radius:4px;overflow:hidden}
+    .prog-fill{height:100%;border-radius:4px;transition:width .5s}
+    .prog-label{display:flex;justify-content:space-between;font-size:10px;color:#bbb;margin-bottom:3px}
+
+    /* VIEW TOGGLE */
+    .view-toggle{display:flex;gap:6px;margin-bottom:12px}
+    .vtog{padding:5px 12px;font-size:11.5px;font-weight:600;border-radius:6px;border:1.5px solid #e0e0ea;cursor:pointer;color:#888;background:white;transition:all .2s}
+    .vtog.active{background:#0f3460;border-color:#0f3460;color:white}
+
+    /* TABLE */
+    .data-table{width:100%;border-collapse:collapse;font-size:12px}
+    .data-table th{padding:8px 10px;text-align:left;font-size:10.5px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #f0f0f6;white-space:nowrap}
+    .data-table td{padding:9px 10px;border-bottom:1px solid #f5f5f9;vertical-align:middle}
+    .data-table tr:last-child td{border-bottom:none}
+    .data-table tr:hover td{background:#fafafe}
+    .rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:10px;font-weight:700;background:#f0f0f6;color:#888}
+    .rank-badge.gold{background:#fff8e1;color:#f57f17}
+    .rank-badge.silver{background:#f5f5f5;color:#757575}
+    .rank-badge.bronze{background:#fbe9e7;color:#bf360c}
+
+    /* AMOUNT TEXT */
+    .amt{font-weight:700;color:#1a1a2e}
+    .amt-small{font-size:10.5px;color:#aaa}
+
+    /* PERIOD TOGGLE (for top customer/product) */
+    .period-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+    .ptog{padding:5px 12px;font-size:11px;font-weight:600;border-radius:6px;border:1.5px solid #e0e0ea;cursor:pointer;color:#888;background:white;transition:all .2s}
+    .ptog.active{background:#e8f0fb;border-color:#0f3460;color:#0f3460}
+
+    /* PROYEKSI CARDS */
+    .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+    .proj-card{background:white;border-radius:12px;padding:16px;border:1px solid #eeeef4;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+    .proj-title{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .proj-val{font-size:20px;font-weight:700;color:#0f3460;margin-bottom:4px}
+    .proj-meta{font-size:11px;color:#aaa;line-height:1.6}
+    .proj-bar-wrap{margin-top:10px}
+    .info-row{display:flex;justify-content:space-between;font-size:11px;padding:5px 0;border-bottom:1px solid #f5f5f9}
+    .info-row:last-child{border-bottom:none}
+    .info-key{color:#aaa}
+    .info-val{font-weight:600;color:#333}
+
+    /* TARGET ACHIEVEMENT COLOR */
+    .ach-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f9}
+    .ach-row:last-child{border-bottom:none}
+    .ach-name{flex:1;font-size:12.5px;font-weight:600}
+    .ach-amt{font-size:12px;font-weight:700;min-width:100px;text-align:right}
+    .ach-pct-box{min-width:55px;text-align:right;font-size:12px;font-weight:700}
+    .ach-bar-wrap{flex:1;min-width:80px}
+
+    /* CHART CONTAINER */
+    .chart-wrap{position:relative;height:200px;margin-top:8px}
+
+    /* MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+    .modal-overlay.show{display:flex}
+    .modal{background:white;border-radius:16px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.2)}
+    .modal-head{padding:18px 20px 14px;border-bottom:1px solid #f0f0f6;display:flex;justify-content:space-between;align-items:center}
+    .modal-title{font-size:15px;font-weight:700}
+    .modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:#aaa;line-height:1}
+    .modal-body{padding:18px 20px}
+    .form-group{margin-bottom:14px}
+    .form-label{font-size:11px;font-weight:700;color:#888;margin-bottom:5px;display:block}
+    .form-input,.form-select{width:100%;border:1px solid #e0e0ea;border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;color:#1a1a2e;background:white;transition:border-color .2s}
+    .form-input:focus,.form-select:focus{outline:none;border-color:#0f3460}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .form-submit{width:100%;background:#0f3460;color:white;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
+    .form-submit:hover{background:#16213e}
+    .form-note{font-size:11px;color:#aaa;margin-top:10px;text-align:center;line-height:1.5}
+
+    /* JADWAL STYLES (carried over) */
+    .div-card{border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid #e8e8ee}
+    .div-header{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;cursor:pointer;user-select:none}
+    .div-title{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;color:white}
+    .div-count{background:rgba(255,255,255,.25);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:600}
+    .div-chevron{font-size:11px;color:rgba(255,255,255,.8);transition:transform .2s}
+    .div-chevron.open{transform:rotate(180deg)}
+    .div-body{padding:12px 15px 15px;background:white;display:none}
+    .div-body.open{display:block}
+    .task-list{margin-bottom:10px}
+    .task-item{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid #f5f5f8}
+    .task-item:last-child{border-bottom:none}
+    .task-cb{width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:#0f3460;margin-top:1px}
+    .task-text{font-size:13px;color:#333;flex:1;line-height:1.4}
+    .task-text.done{text-decoration:line-through;color:#bbb}
+    .task-del{background:none;border:none;cursor:pointer;font-size:14px;color:#bbb;transition:color .15s;flex-shrink:0;padding:0 2px}
+    .task-del:hover{color:#e53935}
+    .task-empty{font-size:12px;color:#ccc;padding:8px 0;font-style:italic}
+    .add-row{display:flex;gap:7px;margin-top:10px}
+    .add-input{flex:1;border:1px solid #e0e0ea;border-radius:8px;padding:7px 11px;font-size:12.5px;font-family:inherit;color:#1a1a2e;transition:border-color .2s}
+    .add-input:focus{outline:none;border-color:#0f3460}
+    .add-btn{background:#0f3460;color:white;border:none;border-radius:8px;padding:7px 13px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .prog-info{display:flex;justify-content:space-between;font-size:10.5px;color:#bbb;margin-bottom:4px}
+    .strategy-area{width:100%;border:1px solid #e0e0ea;border-radius:8px;padding:10px 12px;font-size:12.5px;font-family:inherit;resize:vertical;min-height:90px;color:#1a1a2e;background:#fafafe;line-height:1.55}
+    .strategy-area:focus{outline:none;border-color:#0f3460;background:white}
+    .save-mini-btn{background:#f4f6fb;color:#0f3460;border:1px solid #d0d8e8;border-radius:7px;padding:5px 12px;font-size:11.5px;font-weight:600;cursor:pointer;margin-top:7px;transition:all .2s}
+    .save-mini-btn:hover{background:#0f3460;color:white;border-color:#0f3460}
+    .save-ok{font-size:11px;color:#2e7d32;margin-left:8px;display:none}
+    .carry-tip{background:#f9f3ff;border:1px solid #e8d8ff;border-radius:8px;padding:10px 13px;margin-bottom:12px;font-size:12px;color:#7b3fc9;line-height:1.5}
+    .carry-tip strong{display:block;margin-bottom:4px;font-size:11px;letter-spacing:.4px}
+    .summary-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+    .sum2-card{background:white;border-radius:10px;padding:12px 10px;text-align:center;border:1px solid #eeeef4}
+    .sum2-val{font-size:20px;font-weight:700}
+    .sum2-lbl{font-size:10px;color:#bbb;margin-top:2px}
+    .fu-form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px}
+    .fu-form .full{grid-column:1/-1}
+    .fu-label{font-size:10.5px;font-weight:600;color:#999;margin-bottom:4px}
+    .fu-input,.fu-select{width:100%;border:1px solid #e0e0ea;border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:inherit;color:#1a1a2e;background:white;transition:border-color .2s}
+    .fu-input:focus,.fu-select:focus{outline:none;border-color:#0f3460}
+    .fu-add-btn{background:#0f3460;color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12.5px;font-weight:700;cursor:pointer;width:100%;grid-column:1/-1;transition:background .2s}
+    .fu-item{border:1px solid #eeeef4;border-radius:9px;padding:11px 13px;margin-bottom:9px}
+    .fu-item.done-fu{opacity:.55;background:#f9f9fc}
+    .fu-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:5px}
+    .fu-customer{font-size:13.5px;font-weight:700}
+    .fu-actions{display:flex;gap:5px;flex-shrink:0}
+    .fu-status-btn{font-size:10px;font-weight:700;border-radius:5px;padding:3px 8px;border:none;cursor:pointer}
+    .fu-status-btn.pending{background:#fff3e0;color:#e65100}
+    .fu-status-btn.done{background:#e8f5e9;color:#2e7d32}
+    .fu-del-btn{background:none;border:none;cursor:pointer;font-size:14px;color:#ddd;transition:color .15s}
+    .fu-del-btn:hover{color:#e53935}
+    .fu-meta{font-size:11px;color:#aaa;display:flex;gap:12px;flex-wrap:wrap}
+    .fu-notes{font-size:12px;color:#666;margin-top:5px;font-style:italic}
+    .fu-div-badge{display:inline-block;font-size:9.5px;font-weight:700;border-radius:4px;padding:2px 6px;margin-top:4px}
+
+    /* NOTES */
+    .notes-area{width:100%;border:1px solid #e0e0ea;border-radius:8px;padding:11px 13px;font-size:13px;font-family:inherit;resize:vertical;min-height:105px;color:#1a1a2e;background:white}
+    .notes-area:focus{outline:none;border-color:#0f3460}
+    .save-btn{background:#0f3460;color:white;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer;margin-top:8px}
+    .save-confirm{font-size:11.5px;color:#2e7d32;margin-top:6px;display:none}
+    .refresh-btn{background:none;border:1px solid #ddd;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;color:#777}
+    .refresh-btn:hover{background:#f4f6fb}
+
+    /* LOGIN */
+    .login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a1a2e 0%,#0f3460 100%);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+    .login-box{background:white;border-radius:20px;padding:32px 28px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+    .login-logo{text-align:center;margin-bottom:24px}
+    .login-title{font-size:22px;font-weight:800;color:#0f3460;margin-bottom:4px}
+    .login-sub{font-size:12px;color:#aaa}
+    .login-form-group{margin-bottom:14px}
+    .login-label{font-size:11px;font-weight:700;color:#888;margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.5px}
+    .login-select,.login-pin{width:100%;border:1.5px solid #e0e0ea;border-radius:10px;padding:10px 13px;font-size:14px;font-family:inherit;color:#1a1a2e;background:white;transition:border-color .2s}
+    .login-select:focus,.login-pin:focus{outline:none;border-color:#0f3460}
+    .login-btn{width:100%;background:#0f3460;color:white;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s}
+    .login-btn:hover{background:#16213e}
+    .login-err{font-size:12px;color:#c62828;text-align:center;margin-top:8px;display:none}
+    .logout-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;color:white;transition:background .2s}
+    .logout-btn:hover{background:rgba(255,255,255,.22)}
+    .user-badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;color:white;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .sync-badge{border-radius:20px;padding:4px 10px;font-size:10px;font-weight:700;letter-spacing:.3px;border:1px solid transparent;transition:all .3s}
+    .sync-ok{background:rgba(46,125,50,.25);border-color:rgba(46,125,50,.4);color:#a5d6a7}
+    .sync-ing{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.7);animation:pulse 1s infinite}
+    .sync-err{background:rgba(198,40,40,.25);border-color:rgba(198,40,40,.4);color:#ef9a9a}
+    .sync-off{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    .master-only{display:none}
+    .manager-only{display:none}
+    .view-only-msg{font-size:11.5px;color:#aaa;font-style:italic;padding:8px 0 4px}
+
+    /* SKOR */
+    .skor-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+    .skor-period-sel{border:1px solid #e0e0ea;border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;color:#1a1a2e;background:white;cursor:pointer}
+    .skor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:16px}
+    .skor-card{background:white;border-radius:14px;padding:18px 16px;border:1px solid #eeeef4;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .skor-div-header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .skor-div-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+    .skor-div-name{font-size:13px;font-weight:700;color:#1a1a2e}
+    .skor-div-sub{font-size:10.5px;color:#aaa;margin-top:1px}
+    .skor-big{font-size:42px;font-weight:800;text-align:center;margin:10px 0 4px;line-height:1}
+    .skor-grade{font-size:14px;font-weight:700;text-align:center;padding:4px 14px;border-radius:20px;display:inline-block;margin:0 auto 12px;display:block;width:fit-content;margin:0 auto 12px}
+    .grade-s{background:#e8f5e9;color:#2e7d32}
+    .grade-a{background:#e3f2fd;color:#1565c0}
+    .grade-b{background:#fff8e1;color:#f57f17}
+    .grade-c{background:#fbe9e7;color:#bf360c}
+    .grade-d{background:#fce4ec;color:#880e4f}
+    .skor-hist{margin-top:12px;border-top:1px solid #f0f0f6;padding-top:10px}
+    .skor-hist-title{font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+    .skor-hist-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:11.5px;border-bottom:1px solid #f8f8fb}
+    .skor-hist-row:last-child{border-bottom:none}
+    .skor-hist-date{color:#888}
+    .skor-hist-val{font-weight:700}
+    .skor-avg-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px}
+    .skor-avg-box{background:#f8f9fc;border-radius:8px;padding:8px 10px;text-align:center}
+    .skor-avg-val{font-size:16px;font-weight:700;color:#0f3460}
+    .skor-avg-lbl{font-size:9.5px;color:#aaa;margin-top:2px}
+    .task-edit-btn{background:none;border:none;cursor:pointer;font-size:12px;color:#bbb;transition:color .15s;flex-shrink:0;padding:0 2px}
+    .task-edit-btn:hover{color:#0f3460}
+
+    /* PROMO PLAN */
+    .promo-item{border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1.5px solid #e8e8ee;background:white;position:relative}
+    .promo-item.promo-done{opacity:.6;background:#f9f9fc}
+    .promo-item.promo-overdue{border-color:#ffcdd2;background:#fff8f8}
+    .promo-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+    .promo-name{font-size:13.5px;font-weight:700;color:#1a1a2e;flex:1}
+    .promo-actions{display:flex;gap:5px;flex-shrink:0}
+    .promo-done-btn{font-size:10px;font-weight:700;border-radius:5px;padding:3px 8px;border:none;cursor:pointer;transition:all .2s}
+    .promo-done-btn.pending{background:#fff3e0;color:#e65100}
+    .promo-done-btn.done{background:#e8f5e9;color:#2e7d32}
+    .promo-del-btn{background:none;border:none;cursor:pointer;font-size:14px;color:#ddd;transition:color .15s}
+    .promo-del-btn:hover{color:#e53935}
+    .promo-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#888;margin-bottom:6px}
+    .promo-penalty{background:#fdecea;color:#c62828;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;display:inline-block;margin-top:4px}
+    .promo-ontrack{background:#e8f8ef;color:#2e7d32;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;display:inline-block;margin-top:4px}
+    .promo-section-title{font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px}
+    .skor-promo-section{margin-top:14px;border-top:1px solid #f0f0f6;padding-top:12px}
+    .skor-promo-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:11.5px;border-bottom:1px solid #f8f8fb}
+    .skor-promo-row:last-child{border-bottom:none}
+    .txn-row-actions{display:flex;gap:4px;flex-shrink:0}
+    .act-btn{background:none;border:1px solid #e0e0ea;border-radius:5px;padding:3px 7px;font-size:10.5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .act-btn-edit{color:#0f3460;border-color:#d0d8e8}
+    .act-btn-edit:hover{background:#0f3460;color:white;border-color:#0f3460}
+    .act-btn-del{color:#c62828;border-color:#ffcdd2}
+    .act-btn-del:hover{background:#c62828;color:white;border-color:#c62828}
+
+    /* UTILS */
+    .loading{text-align:center;padding:28px;color:#bbb;font-size:13px}
+    .spinner{display:inline-block;width:17px;height:17px;border:2px solid #e0e0e8;border-top-color:#0f3460;border-radius:50%;animation:spin .75s linear infinite;margin-bottom:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .empty-state{text-align:center;padding:28px;color:#ccc;font-size:13px;line-height:1.7}
+    .tbl-wrap{overflow-x:auto}
+    .badge-pill{display:inline-block;font-size:9.5px;font-weight:700;border-radius:4px;padding:2px 6px}
+    .chip{display:inline-block;font-size:10px;font-weight:600;border-radius:12px;padding:2px 8px}
+  </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div style="font-size:40px;margin-bottom:8px">⚡</div>
+      <div class="login-title">SHOCK IT</div>
+      <div class="login-sub">Sales Morning Briefing</div>
+    </div>
+    <div class="login-form-group">
+      <label class="login-label">Pilih Akun</label>
+      <select class="login-select" id="login-user">
+        <option value="">— Pilih akun —</option>
+        <option value="master">👑 Master</option>
+        <option value="manager">👔 Manager</option>
+        <option value="tiktok">🎵 Admin TikTok &amp; Tokopedia</option>
+        <option value="shopee">🛒 Admin Shopee &amp; Bli2</option>
+        <option value="offline">🏢 Admin Offline Sales &amp; Administrasi</option>
+      </select>
+    </div>
+    <div class="login-form-group">
+      <label class="login-label">PIN</label>
+      <input class="login-pin" id="login-pin" type="password" placeholder="Masukkan PIN" maxlength="8" onkeydown="if(event.key==='Enter')doLogin()"/>
+    </div>
+    <button class="login-btn" onclick="doLogin()">🔐 Masuk</button>
+    <div class="login-err" id="login-err">❌ PIN salah. Coba lagi.</div>
+    <div style="text-align:center;margin-top:14px;font-size:10.5px;color:#ccc">Hubungi Master untuk mendapatkan PIN akun kamu.</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-row">
+    <div>
+      <div class="greeting" id="greeting">Selamat Pagi! ☀️</div>
+      <div class="date-line" id="dateDisplay">–</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span class="sync-badge sync-off" id="sync-badge" title="Status sinkronisasi Sheets">⬤ Offline</span>
+      <span class="user-badge">👤 <span id="user-badge-name">–</span></span>
+      <button class="logout-btn master-only" onclick="openSheetsModal()" title="Sambungkan Google Sheets" style="padding:5px 9px">🔗</button>
+      <button class="logout-btn master-only" onclick="forceSyncAllTasks()" title="Bersihkan Sheets & sinkronkan ulang semua task" style="padding:5px 9px;background:rgba(46,125,50,.25);border-color:rgba(46,125,50,.5)">🔄 Sync</button>
+      <button class="logout-btn master-only" onclick="openModal('modal-pins')" title="Kelola semua PIN" style="padding:5px 9px">🔑</button>
+      <button class="logout-btn master-only" onclick="openModal('modal-txn-list')" title="Edit/Hapus Transaksi" style="padding:5px 9px">📋 Data</button>
+      <button class="logout-btn master-only" onclick="openModal('modal-target-list')" title="Edit/Hapus Target" style="padding:5px 9px">🎯 Target</button>
+      <button class="logout-btn master-only" onclick="openModal('modal-history')" title="History Input Transaksi" style="padding:5px 9px">🕐 History</button>
+      <button class="logout-btn" onclick="openModal('modal-mypin')" title="Ganti PIN saya" style="padding:5px 9px">🔒 Ganti PIN</button>
+      <button class="logout-btn" onclick="doLogout()">Keluar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN TABS -->
+<div class="main-tabs">
+  <div class="main-tab active" onclick="switchMain(this,'jadwal')">📋 Jadwal</div>
+  <div class="main-tab" onclick="switchMain(this,'sales')">📊 Sales</div>
+  <div class="main-tab" onclick="switchMain(this,'notes')">📝 Catatan</div>
+</div>
+
+<div class="content">
+
+<!-- ══════════════════ JADWAL TAB ══════════════════ -->
+<div class="msection active" id="tab-jadwal">
+  <div class="sub-tabs">
+    <div class="sub-tab active" onclick="switchSub(this,'todo')">✅ To-Do Hari Ini</div>
+    <div class="sub-tab" onclick="switchSub(this,'tomorrow')">📣 Plan Promo</div>
+    <div class="sub-tab" onclick="switchSub(this,'week')">🗓️ Strategi Minggu Depan</div>
+    <div class="sub-tab" onclick="switchSub(this,'followup')">👥 Follow-up Customer</div>
+    <div class="sub-tab" onclick="switchSub(this,'skor')">🏆 Skor Kinerja</div>
+  </div>
+  <div class="sub-panel active" id="panel-todo">
+    <div class="summary-strip">
+      <div class="sum2-card"><div class="sum2-val" id="s-total">0</div><div class="sum2-lbl">Total Task</div></div>
+      <div class="sum2-card"><div class="sum2-val" id="s-done" style="color:#2e7d32">0</div><div class="sum2-lbl">Selesai</div></div>
+      <div class="sum2-card"><div class="sum2-val" id="s-left" style="color:#e65100">0</div><div class="sum2-lbl">Tersisa</div></div>
+    </div>
+    <div id="todo-divisions"></div>
+  </div>
+  <div class="sub-panel" id="panel-tomorrow">
+    <!-- Form tambah promo -->
+    <div class="card manager-only" id="promo-form-card">
+      <div class="card-header"><span class="section-label">➕ Tambah Promo Baru</span></div>
+      <div class="form-group">
+        <label class="form-label">Nama Promo *</label>
+        <input class="form-input" id="promo-text" placeholder="Contoh: Promo Gajian Juni, Flash Sale 6.6..."/>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tanggal Mulai *</label>
+          <input class="form-input" id="promo-start" type="date"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Deadline Selesai *</label>
+          <input class="form-input" id="promo-deadline" type="date"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Divisi</label>
+        <select class="form-select" id="promo-div">
+          <option value="tiktok">🎵 TikTok & Tokopedia</option>
+          <option value="shopee">🛒 Shopee & Bli2</option>
+          <option value="offline">🏢 Offline Sales & Admin</option>
+        </select>
+      </div>
+      <button class="form-submit" onclick="addPromo()">+ Tambah Promo</button>
+    </div>
+    <div id="promo-list-wrap"></div>
+  </div>
+  <div class="sub-panel" id="panel-week">
+    <div class="carry-tip" id="carry-tip" style="display:none"><strong>💡 Task belum selesai hari ini (carry forward):</strong><span id="carry-list"></span></div>
+    <div id="week-divisions"></div>
+  </div>
+  <div class="sub-panel" id="panel-skor"><div id="skor-content"></div></div>
+  <div class="sub-panel" id="panel-followup">
+    <div class="card">
+      <div class="card-header"><span class="section-label">➕ Tambah Follow-up</span></div>
+      <div class="fu-form">
+        <div class="full"><div class="fu-label">Nama Customer *</div><input class="fu-input" id="fu-customer" placeholder="Nama customer / perusahaan"/></div>
+        <div><div class="fu-label">Tanggal *</div><input class="fu-input" id="fu-date" type="date"/></div>
+        <div><div class="fu-label">Waktu</div><input class="fu-input" id="fu-time" type="time"/></div>
+        <div><div class="fu-label">Divisi</div><select class="fu-select" id="fu-div"><option value="tiktok">🎵 TikTok & Tokopedia</option><option value="shopee">🛒 Shopee & Bli2</option><option value="offline">🏢 Offline Sales & Admin</option></select></div>
+        <div><div class="fu-label">Channel</div><input class="fu-input" id="fu-channel" placeholder="WA, Email, Telepon..."/></div>
+        <div class="full"><div class="fu-label">Catatan</div><input class="fu-input" id="fu-notes" placeholder="Produk diminati, topik diskusi..."/></div>
+        <button class="fu-add-btn" onclick="addFollowup()">+ Tambah Janji</button>
+      </div>
+    </div>
+    <div class="summary-strip">
+      <div class="sum2-card"><div class="sum2-val" id="fu-total-v">0</div><div class="sum2-lbl">Total</div></div>
+      <div class="sum2-card"><div class="sum2-val" id="fu-pending-v" style="color:#e65100">0</div><div class="sum2-lbl">Pending</div></div>
+      <div class="sum2-card"><div class="sum2-val" id="fu-done-v" style="color:#2e7d32">0</div><div class="sum2-lbl">Selesai</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="section-label">📋 Daftar Follow-up</span>
+        <select class="fu-select" id="fu-filter" style="padding:4px 8px;font-size:11px;width:auto" onchange="renderFollowups()"><option value="all">Semua</option><option value="pending">Pending</option><option value="done">Selesai</option></select>
+      </div>
+      <div id="fu-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ SALES TAB ══════════════════ -->
+<div class="msection" id="tab-sales">
+  <!-- Filter bar -->
+  <div class="sales-bar">
+    <div class="sf-group"><span class="sf-label">Tahun</span><select class="sf-select" id="sf-year" onchange="onYearChange()"></select></div>
+    <div class="sf-group"><span class="sf-label">Quarter</span><select class="sf-select" id="sf-quarter" onchange="onQuarterChange()">
+      <option value="0">Semua Quarter</option>
+      <option value="1">Q1 (Jan–Mar)</option>
+      <option value="2">Q2 (Apr–Jun)</option>
+      <option value="3">Q3 (Jul–Sep)</option>
+      <option value="4">Q4 (Okt–Des)</option>
+    </select></div>
+    <div class="sf-group"><span class="sf-label">Bulan</span><select class="sf-select" id="sf-month" onchange="onMonthChange()">
+      <option value="0">Semua Bulan</option>
+      <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option>
+      <option value="4">April</option><option value="5">Mei</option><option value="6">Juni</option>
+      <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option>
+      <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+    </select></div>
+    <div class="sf-group"><span class="sf-label">Sales</span><select class="sf-select" id="sf-salesperson" onchange="refreshSales()">
+      <option value="">Semua Sales</option>
+    </select></div>
+    <div class="sf-spacer"></div>
+    <button class="sf-btn sf-btn-secondary manager-only" onclick="openModal('modal-target')">⚙ Set Target</button>
+    <button class="sf-btn sf-btn-primary manager-only" onclick="openModal('modal-txn')">+ Transaksi</button>
+  </div>
+
+  <!-- Sub-tabs -->
+  <div class="sub-tabs">
+    <div class="sub-tab active" onclick="switchSalesPanel(this,'pencapaian')">🎯 Pencapaian</div>
+    <div class="sub-tab" onclick="switchSalesPanel(this,'topcust')">👥 Top Customer</div>
+    <div class="sub-tab" onclick="switchSalesPanel(this,'topprod')">📦 Top Produk</div>
+    <div class="sub-tab" onclick="switchSalesPanel(this,'proyeksi')">📈 Proyeksi</div>
+  </div>
+
+  <!-- PENCAPAIAN -->
+  <div class="sub-panel active" id="sp-pencapaian">
+    <div class="sum-strip" id="penc-summary"></div>
+    <div class="card">
+      <div class="card-header">
+        <span class="section-label" id="penc-table-title">Detail per Sales</span>
+        <div class="view-toggle">
+          <div class="vtog active" onclick="setPencView(this,'sales')">By Sales</div>
+          <div class="vtog" onclick="setPencView(this,'customer')">By Customer</div>
+        </div>
+      </div>
+      <div id="penc-table"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="section-label">Trend Bulanan (12 Bulan)</span></div>
+      <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TOP CUSTOMER -->
+  <div class="sub-panel" id="sp-topcust">
+    <div class="period-row">
+      <div class="ptog active" onclick="setTopPeriod(this,'topcust','today')">Hari Ini</div>
+      <div class="ptog" onclick="setTopPeriod(this,'topcust','week')">Minggu Ini</div>
+      <div class="ptog" onclick="setTopPeriod(this,'topcust','month')">Bulan Ini</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="section-label" id="topcust-title">Top 20 Customer — Hari Ini</span></div>
+      <div class="tbl-wrap"><div id="topcust-table"></div></div>
+    </div>
+  </div>
+
+  <!-- TOP PRODUK -->
+  <div class="sub-panel" id="sp-topprod">
+    <div class="period-row">
+      <div class="ptog active" onclick="setTopPeriod(this,'topprod','today')">Hari Ini</div>
+      <div class="ptog" onclick="setTopPeriod(this,'topprod','week')">Minggu Ini</div>
+      <div class="ptog" onclick="setTopPeriod(this,'topprod','month')">Bulan Ini</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="section-label" id="topprod-title">Top 20 Produk — Hari Ini</span></div>
+      <div class="tbl-wrap"><div id="topprod-table"></div></div>
+    </div>
+  </div>
+
+  <!-- PROYEKSI -->
+  <div class="sub-panel" id="sp-proyeksi">
+    <div class="proj-grid" id="proj-cards"></div>
+    <div class="card">
+      <div class="card-header"><span class="section-label">📐 Detail Perhitungan Hari Kerja</span></div>
+      <div id="proj-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ CATATAN TAB ══════════════════ -->
+<div class="msection" id="tab-notes">
+  <div class="card">
+    <div class="card-header"><span class="section-label">📝 Catatan Harian</span></div>
+    <textarea class="notes-area" id="notesArea" placeholder="Tulis catatan produk, target, atau info penting..."></textarea><br>
+    <button class="save-btn" onclick="saveNotes()">💾 Simpan</button>
+    <div class="save-confirm" id="saveConfirm">✅ Tersimpan!</div>
+  </div>
+  <div class="card" id="hist-card" style="display:none">
+    <div class="card-header"><span class="section-label">📋 Catatan Sebelumnya</span></div>
+    <div id="hist-content"></div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<!-- ══════ MODAL: TAMBAH TRANSAKSI ══════ -->
+<div class="modal-overlay" id="modal-txn" onclick="closeModalIf(event,'modal-txn')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">➕ Tambah Transaksi</span>
+      <button class="modal-close" onclick="closeModal('modal-txn')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tanggal *</label><input class="form-input" id="txn-date" type="date"/></div>
+        <div class="form-group"><label class="form-label">Sales Name *</label>
+          <select class="form-select" id="txn-sales">
+            <option value="">— Pilih Sales —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Customer Name *</label><input class="form-input" id="txn-customer" placeholder="Nama customer / perusahaan"/></div>
+      <div class="form-group"><label class="form-label">Nama Produk *</label><input class="form-input" id="txn-product" placeholder="Nama produk"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Qty *</label><input class="form-input" id="txn-qty" type="number" min="1" placeholder="1"/></div>
+        <div class="form-group"><label class="form-label">Total Amount (Rp) *</label><input class="form-input" id="txn-amount" type="number" placeholder="0"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Platform</label>
+        <select class="form-select" id="txn-platform">
+          <option value="tokopedia">Tokopedia</option><option value="shopee">Shopee</option>
+          <option value="tiktok">TikTok Shop</option><option value="bli2">Bli-bli</option><option value="offline">Offline</option>
+        </select>
+      </div>
+      <button class="form-submit" onclick="submitTxn()">Simpan Transaksi</button>
+      <div id="txn-success" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ Transaksi berhasil disimpan!</div>
+      <p class="form-note">💡 Data tersimpan di perangkat Anda dan muncul langsung di semua panel.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: SET TARGET ══════ -->
+<div class="modal-overlay" id="modal-target" onclick="closeModalIf(event,'modal-target')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">⚙ Set Target Penjualan</span>
+      <button class="modal-close" onclick="closeModal('modal-target')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tahun</label><input class="form-input" id="tgt-year" type="number" placeholder="2026"/></div>
+        <div class="form-group"><label class="form-label">Quarter</label><select class="form-select" id="tgt-quarter" onchange="onTgtQuarterChange()">
+          <option value="0">— Pilih Quarter —</option>
+          <option value="1">Q1 (Jan–Mar)</option>
+          <option value="2">Q2 (Apr–Jun)</option>
+          <option value="3">Q3 (Jul–Sep)</option>
+          <option value="4">Q4 (Okt–Des)</option>
+        </select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Bulan</label><select class="form-select" id="tgt-month">
+        <option value="0">— Pilih Bulan —</option>
+        <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option>
+        <option value="4">April</option><option value="5">Mei</option><option value="6">Juni</option>
+        <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option>
+        <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+      </select></div>
+      <div class="form-group"><label class="form-label">Sales (kosong = target total semua sales)</label>
+        <select class="form-select" id="tgt-sales">
+          <option value="">— Semua Sales (TOTAL) —</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Target Bulanan (Rp) *</label><input class="form-input" id="tgt-monthly" type="number" placeholder="150000000"/></div>
+      <div class="form-group"><label class="form-label">Target Quarterly (Rp) — opsional, otomatis Q dari bulan dipilih</label><input class="form-input" id="tgt-quarterly" type="number" placeholder="450000000"/></div>
+      <button class="form-submit" onclick="submitTarget()">Simpan Target</button>
+      <div id="tgt-success" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ Target berhasil disimpan!</div>
+      <div id="tgt-list-wrap" style="margin-top:16px">
+        <div style="font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Target Tersimpan</div>
+        <div id="tgt-list" style="font-size:12px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: EDIT TRANSAKSI (Master only) ══════ -->
+<div class="modal-overlay" id="modal-edit-txn" onclick="closeModalIf(event,'modal-edit-txn')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">✏️ Edit Transaksi</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-txn')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-txn-id"/>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Tanggal *</label><input class="form-input" id="edit-txn-date" type="date"/></div>
+        <div class="form-group"><label class="form-label">Sales Name *</label><select class="form-select" id="edit-txn-sales"><option value="">— Pilih Sales —</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Customer Name *</label><input class="form-input" id="edit-txn-customer"/></div>
+      <div class="form-group"><label class="form-label">Nama Produk *</label><input class="form-input" id="edit-txn-product"/></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Qty *</label><input class="form-input" id="edit-txn-qty" type="number" min="1"/></div>
+        <div class="form-group"><label class="form-label">Total Amount (Rp) *</label><input class="form-input" id="edit-txn-amount" type="number"/></div>
+      </div>
+      <div class="form-group"><label class="form-label">Platform</label>
+        <select class="form-select" id="edit-txn-platform">
+          <option value="tokopedia">Tokopedia</option><option value="shopee">Shopee</option>
+          <option value="tiktok">TikTok Shop</option><option value="bli2">Bli-bli</option><option value="offline">Offline</option>
+        </select>
+      </div>
+      <button class="form-submit" onclick="saveEditTxn()">💾 Simpan Perubahan</button>
+      <div id="edit-txn-ok" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ Transaksi diperbarui!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: EDIT TASK (Master & Manager) ══════ -->
+<div class="modal-overlay" id="modal-edit-task" onclick="closeModalIf(event,'modal-edit-task')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">✏️ Edit Task</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-task')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-task-scope"/>
+      <input type="hidden" id="edit-task-divkey"/>
+      <input type="hidden" id="edit-task-idx"/>
+      <div class="form-group"><label class="form-label">Teks Task *</label><input class="form-input" id="edit-task-text" placeholder="Isi task..."/></div>
+      <button class="form-submit" onclick="saveEditTask()">💾 Simpan Perubahan</button>
+      <div id="edit-task-ok" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ Task diperbarui!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: EDIT TARGET (Master only) ══════ -->
+<div class="modal-overlay" id="modal-edit-target" onclick="closeModalIf(event,'modal-edit-target')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">✏️ Edit Target</span>
+      <button class="modal-close" onclick="closeModal('modal-edit-target')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-tgt-key"/>
+      <div class="form-group"><label class="form-label">Key Target</label><input class="form-input" id="edit-tgt-key-display" readonly style="background:#f4f6fb;color:#888"/></div>
+      <div class="form-group"><label class="form-label">Nilai Target (Rp) *</label><input class="form-input" id="edit-tgt-value" type="number"/></div>
+      <button class="form-submit" onclick="saveEditTarget()">💾 Simpan Perubahan</button>
+      <div id="edit-tgt-ok" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ Target diperbarui!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: DAFTAR TRANSAKSI (Master edit/hapus) ══════ -->
+<div class="modal-overlay" id="modal-txn-list" onclick="closeModalIf(event,'modal-txn-list')">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head">
+      <span class="modal-title">📋 Daftar Transaksi</span>
+      <button class="modal-close" onclick="closeModal('modal-txn-list')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px">
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <input class="form-input" id="txn-search" placeholder="🔍 Cari customer / produk / sales..." style="flex:1;font-size:12px" oninput="renderTxnList()"/>
+      </div>
+      <div id="txn-list-wrap" style="max-height:420px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: DAFTAR TARGET (Master edit/hapus) ══════ -->
+<div class="modal-overlay" id="modal-target-list" onclick="closeModalIf(event,'modal-target-list')">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-head">
+      <span class="modal-title">📋 Kelola Target</span>
+      <button class="modal-close" onclick="closeModal('modal-target-list')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:12px 16px">
+      <div id="target-list-manage" style="max-height:480px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: HISTORY INPUT TRANSAKSI (Master only) ══════ -->
+<div class="modal-overlay" id="modal-history" onclick="closeModalIf(event,'modal-history')">
+  <div class="modal" style="max-width:820px;width:95vw">
+    <div class="modal-head">
+      <span class="modal-title">🕐 History Input Transaksi</span>
+      <button class="modal-close" onclick="closeModal('modal-history')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:14px 16px">
+      <!-- Filter bar -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px">Dari Tanggal</span>
+          <input class="form-input" id="hist-from" type="date" style="font-size:12px;padding:6px 10px"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px">Sampai Tanggal</span>
+          <input class="form-input" id="hist-to" type="date" style="font-size:12px;padding:6px 10px"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px">Sales</span>
+          <select class="form-select" id="hist-sales" style="font-size:12px;padding:6px 10px">
+            <option value="">Semua Sales</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <span style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px">Platform</span>
+          <select class="form-select" id="hist-platform" style="font-size:12px;padding:6px 10px">
+            <option value="">Semua Platform</option>
+            <option value="tokopedia">Tokopedia</option>
+            <option value="shopee">Shopee</option>
+            <option value="tiktok">TikTok Shop</option>
+            <option value="bli2">Bli-bli</option>
+            <option value="offline">Offline</option>
+          </select>
+        </div>
+        <button onclick="renderHistory()" style="background:#0f3460;color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;align-self:flex-end">🔍 Filter</button>
+        <button onclick="resetHistFilter()" style="background:#f4f6fb;color:#0f3460;border:1px solid #d0d8e8;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;align-self:flex-end">↺ Reset</button>
+      </div>
+      <!-- Ringkasan -->
+      <div id="hist-summary-strip" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px"></div>
+      <!-- Tab: Tabel / Log -->
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button id="htab-tabel" onclick="switchHistTab('tabel')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:6px;border:1.5px solid #0f3460;background:#0f3460;color:white;cursor:pointer">📊 Tabel Transaksi</button>
+        <button id="htab-log" onclick="switchHistTab('log')" style="padding:6px 14px;font-size:12px;font-weight:700;border-radius:6px;border:1.5px solid #e0e0ea;background:white;color:#888;cursor:pointer">📝 Log Aktivitas</button>
+      </div>
+      <div id="hist-tabel-wrap" style="max-height:380px;overflow-y:auto"></div>
+      <div id="hist-log-wrap" style="max-height:380px;overflow-y:auto;display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: GANTI PIN SAYA ══════ -->
+<div class="modal-overlay" id="modal-mypin" onclick="closeModalIf(event,'modal-mypin')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">🔒 Ganti PIN Saya</span>
+      <button class="modal-close" onclick="closeModal('modal-mypin')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="mypin-user-info" style="background:#f4f6fb;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#1a1a2e;font-weight:600"></div>
+      <div class="form-group">
+        <label class="form-label">PIN Lama (untuk verifikasi)</label>
+        <input class="form-input" id="mypin-old" type="password" placeholder="Masukkan PIN lama" maxlength="8"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">PIN Baru (minimal 4 digit)</label>
+        <input class="form-input" id="mypin-new" type="password" placeholder="Masukkan PIN baru" maxlength="8"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Konfirmasi PIN Baru</label>
+        <input class="form-input" id="mypin-confirm" type="password" placeholder="Ulangi PIN baru" maxlength="8"/>
+      </div>
+      <button class="form-submit" onclick="saveMyPin()">🔒 Simpan PIN Baru</button>
+      <div id="mypin-err" style="font-size:12px;color:#c62828;text-align:center;margin-top:8px;display:none"></div>
+      <div id="mypin-ok" style="font-size:12px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ PIN berhasil diperbarui!</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: SHEETS URL SETUP ══════ -->
+<div class="modal-overlay" id="modal-sheets" onclick="closeModalIf(event,'modal-sheets')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">🔗 Sambungkan Google Sheets</span>
+      <button class="modal-close" onclick="closeModal('modal-sheets')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#e8f0fb;border:1px solid #bbdefb;border-radius:8px;padding:10px 13px;margin-bottom:14px;font-size:11.5px;color:#0d47a1;line-height:1.6">
+        📋 Paste URL Web App dari Google Apps Script di sini. Setelah disimpan, semua perangkat tim akan sinkron otomatis via Google Sheets.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Apps Script Web App URL</label>
+        <input class="form-input" id="sheets-url-input" type="url" placeholder="https://script.google.com/macros/s/AKfy.../exec" style="font-size:11.5px"/>
+      </div>
+      <button class="form-submit" onclick="saveAndTestSheetsUrl()">💾 Simpan & Test Koneksi</button>
+      <div id="sheets-test-result" style="margin-top:10px;font-size:12px;text-align:center;display:none"></div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid #f0f0f6">
+        <div style="font-size:10.5px;color:#aaa;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">URL tersimpan saat ini</div>
+        <div id="sheets-url-current" style="font-size:11px;color:#666;word-break:break-all"></div>
+        <button onclick="clearSheetsUrl()" style="margin-top:8px;background:none;border:1px solid #ffcdd2;border-radius:6px;padding:4px 10px;font-size:11px;color:#e53935;cursor:pointer">🗑 Hapus URL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ MODAL: PENGATURAN PIN ══════ -->
+<div class="modal-overlay" id="modal-pins" onclick="closeModalIf(event,'modal-pins')">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">🔑 Pengaturan PIN</span>
+      <button class="modal-close" onclick="closeModal('modal-pins')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:10px 13px;margin-bottom:16px;font-size:11.5px;color:#7a5c00;line-height:1.5">
+        🔑 Hanya <strong>Master</strong> yang dapat mengubah PIN. Kosongkan field = PIN tidak berubah. Minimal 4 digit.
+      </div>
+      <div style="font-size:10.5px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">PIN Semua Akun</div>
+      <div class="form-group"><label class="form-label">👑 Master (akun kamu sendiri)</label><input class="form-input" id="pin-master" type="password" placeholder="PIN baru (kosongkan = tidak berubah)" maxlength="8"/></div>
+      <div style="height:1px;background:#f0f0f6;margin:14px 0"></div>
+      <div class="form-group"><label class="form-label">👔 Manager</label><input class="form-input" id="pin-manager" type="password" placeholder="PIN baru (kosongkan = tidak berubah)" maxlength="8"/></div>
+      <div class="form-group"><label class="form-label">🎵 Admin TikTok &amp; Tokopedia</label><input class="form-input" id="pin-tiktok" type="password" placeholder="PIN baru (kosongkan = tidak berubah)" maxlength="8"/></div>
+      <div class="form-group"><label class="form-label">🛒 Admin Shopee &amp; Bli2</label><input class="form-input" id="pin-shopee" type="password" placeholder="PIN baru (kosongkan = tidak berubah)" maxlength="8"/></div>
+      <div class="form-group"><label class="form-label">🏢 Admin Offline Sales &amp; Administrasi</label><input class="form-input" id="pin-offline" type="password" placeholder="PIN baru (kosongkan = tidak berubah)" maxlength="8"/></div>
+      <button class="form-submit" onclick="savePins()">💾 Simpan Perubahan PIN</button>
+      <div id="pins-ok" style="font-size:11.5px;color:#2e7d32;text-align:center;margin-top:8px;display:none">✅ PIN berhasil diperbarui!</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   KONSTANTA & HELPERS GLOBAL
+   (harus di atas semua fungsi yang menggunakannya)
+═══════════════════════════════════════════════ */
+const DEFAULT_PINS  = {master:'9999',manager:'4682',tiktok:'7315',shopee:'8246',offline:'5173'};
+const ROLE_LABELS   = {
+  master  :'👑 Master',
+  manager :'Manager',
+  tiktok  :'Admin TikTok & Tokopedia',
+  shopee  :'Admin Shopee & Bli2',
+  offline :'Admin Offline Sales & Administrasi'
+};
+const ROLE_LEVEL    = {master:3, manager:2, tiktok:1, shopee:1, offline:1};
+const DIV_FOR_ROLE  = {tiktok:'tiktok', shopee:'shopee', offline:'offline'};
+
+let currentUser = null;
+let currentRole = null; /* 'master' | 'manager' | 'staff' */
+
+/* ── localStorage helpers ── */
+function _lsLoad(k,def){try{const v=localStorage.getItem(k);return v===null?def:JSON.parse(v)??def}catch{return def}}
+function _lsSave(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){console.warn('lsSave',k,e)}}
+
+/* ── Auth helpers ── */
+function getPins()            {return _lsLoad('si_pins', DEFAULT_PINS)}
+function getSession()         {return _lsLoad('si_session', null)}
+function saveSession(user)    {_lsSave('si_session',{user,time:Date.now()})}
+function clearSession()       {localStorage.removeItem('si_session')}
+function resolveRole(user)    {if(user==='master')return'master';if(user==='manager')return'manager';return'staff'}
+
+/* ═══════════════════════════════════════════════
+   GOOGLE SHEETS API LAYER
+═══════════════════════════════════════════════ */
+/* URL default — hardcoded agar semua cabang otomatis terhubung */
+const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyE6q2VFmO-jFi2QMfLjS68p6hs7lEzrKlubYZ1bgfEjDu9gQj4gBPncZAXKegbI-ucAQ/exec';
+/* Selalu force-set ke DEFAULT — override localStorage lama yang mungkin salah */
+let SHEETS_URL = DEFAULT_SHEETS_URL;
+_lsSave('si_sheets_url', DEFAULT_SHEETS_URL);
+
+function setSheetsUrl(url){
+  SHEETS_URL = url.trim();
+  _lsSave('si_sheets_url', SHEETS_URL);
+}
+
+/* ── Sync badge ── */
+function showSyncBadge(state){
+  const el=document.getElementById('sync-badge');
+  if(!el)return;
+  el.className='sync-badge';
+  if(state==='ok')      {el.classList.add('sync-ok');  el.textContent='✓ Synced';}
+  else if(state==='ing'){el.classList.add('sync-ing'); el.textContent='↻ Syncing…';}
+  else if(state==='err'){el.classList.add('sync-err'); el.textContent='✕ Sync Error';}
+  else                  {el.classList.add('sync-off'); el.textContent='⬤ Offline';}
+}
+
+/* ── apiGet: JSONP — bypass CORS dari netlify.app ke script.google.com ──
+   Google Apps Script melakukan redirect 302. Browser ikut redirect dan
+   baru memanggil callback setelah URL final selesai.
+   PENTING: jangan hapus window[cbName] saat script di-remove (onerror/onload)
+   karena callback bisa datang SETELAH redirect selesai.
+   Hapus callback hanya saat callback benar dipanggil, atau saat timeout. */
+let _cbCounter = 0;
+function apiGet(action){
+  if(!SHEETS_URL) return Promise.resolve(null);
+  return new Promise(resolve=>{
+    const cbName = '_cb_' + action + '_' + (++_cbCounter);
+    let resolved = false;
+
+    /* Daftarkan callback di window sebelum inject script */
+    window[cbName] = data => {
+      if(resolved) return;
+      resolved = true;
+      clearTimeout(window['_timer_' + cbName]);
+      delete window[cbName];
+      delete window['_timer_' + cbName];
+      resolve(data && data.ok ? data.data : null);
+    };
+
+    /* Timeout 15 detik (cukup untuk redirect + Apps Script response) */
+    window['_timer_' + cbName] = setTimeout(()=>{
+      if(resolved) return;
+      resolved = true;
+      delete window[cbName];
+      delete window['_timer_' + cbName];
+      console.warn('[apiGet] timeout:', action);
+      resolve(null);
+    }, 15000);
+
+    const script = document.createElement('script');
+    /* t= cache-busting supaya browser tidak cache response lama */
+    script.src = `${SHEETS_URL}?action=${action}&callback=${cbName}&t=${Date.now()}`;
+    /* onerror: script gagal load (jaringan mati).
+       JANGAN langsung resolve — redirect mungkin masih bisa berhasil.
+       Biarkan timeout yang men-resolve. */
+    script.onerror = () => { script.remove(); };
+    script.onload  = () => { script.remove(); };
+    document.head.appendChild(script);
+  });
+}
+
+/* ── apiPost: fetch dengan Content-Type text/plain ──
+   text/plain tidak trigger CORS preflight, sehingga POST bisa dikirim.
+   Response tidak bisa dibaca (opaque) tapi data MASUK ke Apps Script. */
+async function apiPost(body){
+  if(!SHEETS_URL) return false;
+  try{
+    await fetch(SHEETS_URL,{
+      method :'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body   :JSON.stringify(body),
+      redirect:'follow'
+    });
+    return true;
+  }catch(e){
+    console.warn('[apiPost] error:', e.message);
+    return false;
+  }
+}
+
+/* ── syncFromSheets: ambil semua data dari Sheets → localStorage → re-render ── */
+let _syncInProgress = false;
+let _syncStartTime  = 0;
+/* _pendingDone: in-memory {taskId: boolean} — set HANYA oleh klik user.
+   Bertahan selama session, tidak terpengaruh sync.
+   PRIORITAS TERTINGGI dalam merge: lebih kuat dari Sheets maupun localStorage. */
+const _pendingDone = {};
+async function syncFromSheets(){
+  if(!SHEETS_URL){showSyncBadge('off');return;}
+  /* Safety: auto-reset lock jika stuck > 30 detik */
+  if(_syncInProgress){
+    if(Date.now() - _syncStartTime < 30000) return;
+    console.warn('[syncFromSheets] lock stuck > 30s, force-reset');
+    _syncInProgress = false;
+  }
+  _syncInProgress = true;
+  _syncStartTime  = Date.now();
+  showSyncBadge('ing');
+  try{
+    /* Semua request HARUS sequential — JSONP race condition kalau parallel */
+    const tasks     = await apiGet('getTasks');
+    const pins      = await apiGet('getPins');
+    const targets   = await apiGet('getTargets');
+    const txns      = await apiGet('getTxns');
+    const followups = await apiGet('getFollowups');
+
+    /* ── Update transaksi ──
+       MERGE: Sheets adalah sumber kebenaran utama.
+       Transaksi lokal yang belum di Sheets → push semuanya ke Sheets (bulk replace).
+       Ini memastikan cabang selalu bisa baca data dari Sheets, bukan hanya lokal. */
+    if(txns !== null){
+      const sheetTxnIds  = new Set(txns.map(t=>String(t.id)));
+      const localTxns    = _lsLoad('si_txns', []);
+      const localNewTxns = localTxns.filter(t=>!sheetTxnIds.has(String(t.id)));
+      /* Gabungkan Sheets + transaksi lokal yang belum ada */
+      const mergedTxns = [...txns, ...localNewTxns];
+      _lsSave('si_txns', mergedTxns);
+      /* Kalau ada transaksi lokal baru → kirim semua ke Sheets (setAllTxns = bulk replace) */
+      if(localNewTxns.length > 0) setTimeout(pushAllTxnsToSheets, 600);
+    }
+    if(targets !== null) _lsSave('si_targets', targets);
+
+    /* ── Update tasks: MERGE Sheets + Lokal ──
+       Aturan merge:
+         1. Task di Sheets → sumber kebenaran untuk teks & keberadaan task
+         2. Done status: GUNAKAN LOKAL jika ada (aksi user lebih baru dari Sheets)
+            → ini mencegah ceklist staff hilang saat sync berjalan sebelum push selesai
+         3. Task lokal yang belum ada di Sheets → tambahkan (task baru dari browser ini)
+         4. Kalau ada task baru lokal → push ke Sheets agar semua browser dapat */
+    if(tasks !== null){
+      /* Kelompokkan task Sheets per scope+divKey */
+      const sheetsBuckets = {};
+      tasks.forEach(t=>{
+        if(!t.id || !t.divKey || !t.scope) return;
+        const key = `${t.scope}__${t.divKey}`;
+        if(!sheetsBuckets[key]) sheetsBuckets[key]=[];
+        sheetsBuckets[key].push({
+          id  : Number(t.id) || String(t.id),
+          text: String(t.text || '').trim(),
+          done: (t.done===true||t.done==='TRUE'||t.done==='true')
+        });
+      });
+
+      const allKeys = new Set(Object.keys(sheetsBuckets));
+      DIVISIONS.forEach(d=>{
+        allKeys.add(`today__${d.key}`);
+        allKeys.add(`tomorrow__${d.key}`);
+        allKeys.add(`week__${d.key}`);
+      });
+
+      let needPush = false;
+
+      allKeys.forEach(key=>{
+        const [scope, divKey] = key.split('__');
+        const sheetsArr = sheetsBuckets[key] || [];
+        const localArr  = _lsLoad(`si_tasks_${scope}_${divKey}`, []);
+
+        /* Buat map lokal by id untuk lookup cepat */
+        const localMap = {};
+        localArr.forEach(t=>{ localMap[String(t.id)] = t; });
+        const sheetsIds = new Set(sheetsArr.map(t=>String(t.id)));
+
+        /* Task lokal yang TIDAK ada di Sheets → task baru dari browser ini */
+        const localOnly = localArr.filter(t=>!sheetsIds.has(String(t.id)));
+        if(localOnly.length > 0) needPush = true;
+
+        /* Merge: tentukan done dengan prioritas:
+           1. _pendingDone (klik user session ini) — TERTINGGI, immune terhadap race
+           2. Sticky-true: jika Sheets=true ATAU lokal=true → true
+              (ceklist tidak bisa hilang hanya karena salah satu browser belum sinkron)
+           3. Jika keduanya false → false */
+        const merged = sheetsArr.map(t=>{
+          const tid        = String(t.id);
+          const sheetsDone = (t.done===true||t.done==='TRUE'||t.done==='true');
+          const localDone  = localMap[tid] !== undefined ? !!localMap[tid].done : false;
+          const done = (tid in _pendingDone)
+            ? _pendingDone[tid]          // klik user session ini → prioritas absolut
+            : (sheetsDone || localDone); // sticky-true: sekali true, tetap true
+          return { id: t.id, text: t.text, done };
+        });
+
+        /* Tambahkan task lokal baru */
+        merged.push(...localOnly);
+
+        /* Deduplikasi by id */
+        const seen = new Set();
+        const deduped = merged.filter(t=>{
+          const k = String(t.id);
+          if(seen.has(k)) return false;
+          seen.add(k); return true;
+        });
+
+        _lsSave(`si_tasks_${scope}_${divKey}`, deduped);
+      });
+
+      /* Kalau ada task lokal baru, push ke Sheets */
+      if(needPush) setTimeout(pushAllTasksToSheets, 500);
+    }
+
+    /* ── Update followups & pins ── */
+    if(followups !== null) _lsSave('si_followups', followups.map(f=>({...f,id:Number(f.id)||f.id})));
+    if(pins      !== null) _lsSave('si_pins', pins);
+
+    showSyncBadge('ok');
+
+    /* Re-render hanya kalau user sudah login */
+    if(currentUser){
+      renderTasksSection('today','todo-divisions');
+      renderPromos();
+      renderFollowups();
+      if(document.getElementById('tab-sales')?.classList.contains('active')){
+        initFilters(); refreshSales();
+      }
+    }
+  }catch(e){
+    console.error('[syncFromSheets] error:', e);
+    showSyncBadge('err');
+  }finally{
+    _syncInProgress = false;
+  }
+}
+
+/* ── pushAllTasksToSheets: kirim SEMUA task lokal ke Sheets (replace penuh) ──
+   Dipanggil setiap kali siapapun tambah, hapus, edit, atau ceklist task.
+   Menyertakan done status aktual dan semua scope (today, tomorrow, week). */
+async function pushAllTasksToSheets(){
+  if(!SHEETS_URL) return;
+  showSyncBadge('ing');
+  const allTasks=[];
+  ['today','tomorrow','week'].forEach(scope=>{
+    DIVISIONS.forEach(d=>{
+      _lsLoad(`si_tasks_${scope}_${d.key}`,[]).forEach(t=>{
+        allTasks.push({id:t.id, scope, divKey:d.key, text:t.text, done:!!(t.done)});
+      });
+    });
+  });
+  const ok = await apiPost({action:'setAllTasks', tasks:allTasks});
+  showSyncBadge(ok?'ok':'err');
+}
+
+/* ── pushAllTxnsToSheets: kirim SEMUA transaksi lokal ke Sheets (bulk replace) ──
+   Dipanggil saat sync menemukan transaksi lokal yang belum ada di Sheets.
+   Menggunakan action setAllTxns agar tidak ada duplikasi. */
+async function pushAllTxnsToSheets(){
+  if(!SHEETS_URL) return;
+  const allTxns = _lsLoad('si_txns', []);
+  if(!allTxns.length) return;
+  showSyncBadge('ing');
+  const ok = await apiPost({action:'setAllTxns', txns:allTxns});
+  showSyncBadge(ok?'ok':'err');
+  if(ok) console.log('[pushAllTxnsToSheets] OK —', allTxns.length, 'transaksi');
+  else   console.warn('[pushAllTxnsToSheets] gagal');
+}
+
+/* ── forceSyncAllTasks: tombol 🔄 Master — kirim tasks + transaksi ke Sheets ── */
+async function forceSyncAllTasks(){
+  if(!SHEETS_URL){alert('Belum ada Google Sheets URL. Sambungkan dulu via tombol 🔗.');return;}
+  if(!confirm('Ini akan mengirim SEMUA data lokal (task + transaksi) ke Google Sheets.\nCabang akan mendapat data terbaru saat mereka refresh.\n\nLanjutkan?'))return;
+  showSyncBadge('ing');
+  /* Push tasks dan transaksi sekaligus */
+  await pushAllTasksToSheets();
+  await pushAllTxnsToSheets();
+  setTimeout(async()=>{
+    await syncFromSheets();
+    alert('✅ Sinkronisasi selesai! Task & data penjualan sudah tersimpan ke database pusat.\nSemua cabang akan mendapat data terbaru.');
+  },800);
+}
+
+/* ═══════════════════════════════════════════════
+   LOGIN / AUTH SYSTEM
+═══════════════════════════════════════════════ */
+async function doLogin(){
+  const user = document.getElementById('login-user').value;
+  const pin  = document.getElementById('login-pin').value;
+  if(!user){alert('Pilih akun dulu!');return;}
+
+  /* Coba ambil PIN terbaru dari Sheets, fallback ke localStorage */
+  let pins = getPins();
+  if(SHEETS_URL){
+    const remotePins = await apiGet('getPins');
+    if(remotePins && Object.keys(remotePins).length > 0){
+      pins = remotePins;
+      _lsSave('si_pins', pins);
+    }
+  }
+
+  if(pins[user] && pin === String(pins[user])){
+    currentUser = user;
+    currentRole = resolveRole(user);
+    saveSession(user);
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('login-pin').value='';
+    document.getElementById('login-err').style.display='none';
+    applyRoleUI();
+    /* Sync langsung setelah login — tidak perlu tunggu 20 detik */
+    syncFromSheets();
+  }else{
+    document.getElementById('login-err').style.display='block';
+    document.getElementById('login-pin').value='';
+  }
+}
+
+function doLogout(){
+  clearSession();
+  currentUser=null; currentRole=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-user').value='';
+  document.getElementById('login-pin').value='';
+  document.getElementById('login-err').style.display='none';
+}
+
+function applyRoleUI(){
+  const isMaster     = (currentRole==='master');
+  const isMgrOrAbove = (currentRole==='master'||currentRole==='manager');
+  document.getElementById('user-badge-name').textContent = ROLE_LABELS[currentUser]||currentUser;
+
+  document.querySelectorAll('.master-only').forEach(el=>{
+    el.style.display = isMaster?'inline-block':'none';
+  });
+  document.querySelectorAll('.manager-only').forEach(el=>{
+    el.style.display = isMgrOrAbove?'inline-block':'none';
+  });
+
+  /* Render dulu dari data lokal (cepat) */
+  renderTasksSection('today','todo-divisions');
+  renderPromos();
+
+  /* Lalu sync dari Sheets (akan re-render lagi setelah data tiba) */
+  syncFromSheets();
+}
+
+function checkSession(){
+  const sess=getSession();
+  if(sess && sess.user && (Date.now()-sess.time < 12*3600*1000)){
+    currentUser = sess.user;
+    currentRole = resolveRole(sess.user);
+    document.getElementById('login-screen').style.display='none';
+    return true;
+  }
+  document.getElementById('login-screen').style.display='flex';
+  return false;
+}
+
+function openModal(id){
+  document.getElementById(id).classList.add('show');
+  if(id==='modal-target'){
+    renderTargetList();
+    /* Populate tgt-sales dropdown */
+    const tgtSalesSel=document.getElementById('tgt-sales');
+    if(tgtSalesSel&&tgtSalesSel.options.length<=1){
+      SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;tgtSalesSel.appendChild(o)});
+    }
+    /* Set defaults */
+    if(!document.getElementById('tgt-year').value) document.getElementById('tgt-year').value=new Date().getFullYear();
+    const nowQ=Math.ceil((new Date().getMonth()+1)/3);
+    if(!document.getElementById('tgt-quarter').value||document.getElementById('tgt-quarter').value==='0') document.getElementById('tgt-quarter').value=nowQ;
+    if(!document.getElementById('tgt-month').value||document.getElementById('tgt-month').value==='0') document.getElementById('tgt-month').value=new Date().getMonth()+1;
+  }
+  if(id==='modal-txn'){
+    document.getElementById('txn-date').value=todayStr();
+    /* Populate txn-sales dropdown */
+    const txnSalesSel=document.getElementById('txn-sales');
+    if(txnSalesSel&&txnSalesSel.options.length<=1){
+      SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;txnSalesSel.appendChild(o)});
+    }
+    /* Auto-select current user's sales account */
+    if(currentUser&&currentUser!=='master'&&currentUser!=='manager'&&txnSalesSel){
+      const myLabel=ROLE_LABELS[currentUser]||'';
+      for(let i=0;i<txnSalesSel.options.length;i++){
+        if(txnSalesSel.options[i].value===myLabel){txnSalesSel.selectedIndex=i;break;}
+      }
+    }
+  }
+  if(id==='modal-txn-list'){renderTxnList();}
+  if(id==='modal-target-list'){renderTargetManage();}
+  if(id==='modal-history'){openHistoryModal();}
+  if(id==='modal-mypin'){
+    /* tampilkan info akun siapa yang sedang login */
+    document.getElementById('mypin-user-info').textContent=
+      '👤 Akun: ' + (ROLE_LABELS[currentUser]||currentUser);
+    document.getElementById('mypin-old').value='';
+    document.getElementById('mypin-new').value='';
+    document.getElementById('mypin-confirm').value='';
+    document.getElementById('mypin-err').style.display='none';
+    document.getElementById('mypin-ok').style.display='none';
+  }
+}
+
+async function saveMyPin(){
+  const oldPin = document.getElementById('mypin-old').value.trim();
+  const newPin = document.getElementById('mypin-new').value.trim();
+  const confirm = document.getElementById('mypin-confirm').value.trim();
+  const errEl = document.getElementById('mypin-err');
+  const okEl  = document.getElementById('mypin-ok');
+
+  errEl.style.display='none'; okEl.style.display='none';
+
+  /* Validasi */
+  const pins = getPins();
+  if(String(pins[currentUser]) !== oldPin){
+    errEl.textContent='❌ PIN lama salah.'; errEl.style.display='block'; return;
+  }
+  if(newPin.length < 4){
+    errEl.textContent='❌ PIN baru minimal 4 digit.'; errEl.style.display='block'; return;
+  }
+  if(newPin !== confirm){
+    errEl.textContent='❌ Konfirmasi PIN tidak cocok.'; errEl.style.display='block'; return;
+  }
+  if(newPin === oldPin){
+    errEl.textContent='❌ PIN baru harus berbeda dari PIN lama.'; errEl.style.display='block'; return;
+  }
+
+  /* Simpan hanya PIN akun sendiri */
+  pins[currentUser] = newPin;
+  _lsSave('si_pins', pins);
+
+  /* Sync ke Sheets */
+  const ok = await apiPost({action:'savePins', pins});
+  if(ok){
+    okEl.textContent='✅ PIN berhasil diperbarui di semua perangkat!';
+    okEl.style.display='block';
+    showSyncBadge('ok');
+    /* update session supaya login berikutnya pakai PIN baru */
+    saveSession(currentUser);
+    setTimeout(()=>closeModal('modal-mypin'), 2000);
+  } else {
+    okEl.textContent='✅ PIN diperbarui (lokal). Sync ke Sheets gagal — cek koneksi internet.';
+    okEl.style.display='block';
+    setTimeout(()=>closeModal('modal-mypin'), 2500);
+  }
+}
+
+function openSheetsModal(){
+  document.getElementById('sheets-url-input').value = SHEETS_URL || '';
+  document.getElementById('sheets-url-current').textContent = SHEETS_URL || '(belum ada)';
+  document.getElementById('sheets-test-result').style.display='none';
+  openModal('modal-sheets');
+}
+
+async function saveAndTestSheetsUrl(){
+  const url = document.getElementById('sheets-url-input').value.trim();
+  if(!url){alert('Masukkan URL terlebih dahulu.');return;}
+  setSheetsUrl(url);
+  const res = document.getElementById('sheets-test-result');
+  res.style.display='block';
+  res.style.color='#888';
+  res.textContent='⏳ Menguji koneksi...';
+  try{
+    const data = await apiGet('getPins');
+    if(data){
+      res.style.color='#2e7d32';
+      res.textContent='✅ Koneksi berhasil! Google Sheets terhubung.';
+      document.getElementById('sheets-url-current').textContent=url;
+      setTimeout(()=>{closeModal('modal-sheets');syncFromSheets();},1500);
+    } else {
+      res.style.color='#c62828';
+      res.textContent='❌ Tidak bisa membaca data. Cek URL dan pastikan Web App sudah di-deploy dengan benar.';
+    }
+  } catch(e){
+    res.style.color='#c62828';
+    res.textContent='❌ Error: '+e.message;
+  }
+}
+
+function clearSheetsUrl(){
+  if(!confirm('Hapus URL Sheets? Dashboard akan kembali ke mode offline (localStorage).'))return;
+  SHEETS_URL='';_lsSave('si_sheets_url','');
+  document.getElementById('sheets-url-current').textContent='(belum ada)';
+  document.getElementById('sheets-url-input').value='';
+  showSyncBadge('off');
+}
+
+function savePins(){
+  const pins=getPins();
+  ['master','manager','tiktok','shopee','offline'].forEach(k=>{
+    const el=document.getElementById('pin-'+k);
+    if(!el)return;
+    const val=el.value.trim();
+    if(val.length>=4)pins[k]=val;
+    el.value='';
+  });
+  _lsSave('si_pins',pins);
+  apiPost({action:'savePins',pins}).then(r=>{
+    showSyncBadge(r?'ok':'err');
+    if(r) alert('✅ PIN berhasil disimpan ke semua perangkat via Google Sheets!');
+    else alert('⚠️ PIN tersimpan lokal tapi gagal sync ke Sheets. Pastikan koneksi internet aktif.');
+  });
+  const ok=document.getElementById('pins-ok');ok.style.display='block';
+  setTimeout(()=>ok.style.display='none',2500);
+}
+
+/* ═══════════════════════════════════════════════
+   CONSTANTS & HELPERS
+═══════════════════════════════════════════════ */
+/* Akun sales terdaftar — sinkron dengan login accounts */
+const SALES_ACCOUNTS = [
+  {key:'manager', label:'Manager'},
+  {key:'tiktok',  label:'Admin TikTok & Tokopedia'},
+  {key:'shopee',  label:'Admin Shopee & Bli2'},
+  {key:'offline', label:'Admin Offline Sales & Administrasi'},
+];
+function salesOptsHTML(includeAll,blankLabel){
+  let h = includeAll ? `<option value="">${blankLabel||'Semua Sales'}</option>` : '';
+  SALES_ACCOUNTS.forEach(s=>{ h+=`<option value="${s.label}">${s.label}</option>`; });
+  return h;
+}
+function quarterMonths(q){return{1:[1,2,3],2:[4,5,6],3:[7,8,9],4:[10,11,12]}[q]||[]}
+
+const DAYS   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const MONTHS_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const DIVISIONS = [
+  {key:'tiktok',label:'TikTok & Tokopedia',icon:'🎵',color:'#E91E8C'},
+  {key:'shopee',label:'Shopee & Bli2',icon:'🛒',color:'#F77234'},
+  {key:'offline',label:'Offline Sales & Administrasi',icon:'🏢',color:'#0f3460'},
+];
+const DIV_MAP = Object.fromEntries(DIVISIONS.map(d=>[d.key,d]));
+
+/* loadLS/saveLS = alias dari _lsLoad/_lsSave (didefinisikan di atas) */
+function loadLS(k,def){return _lsLoad(k,def)}
+function saveLS(k,v){_lsSave(k,v)}
+function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function idr(n){return 'Rp '+Math.round(n).toLocaleString('id-ID')}
+function todayStr(){return new Date().toISOString().split('T')[0]}
+function pct(a,b){return b?Math.min(Math.round(a/b*100),999):0}
+function pctColor(p){return p>=100?'pct-good':p>=70?'pct-warn':'pct-bad'}
+function relDate(iso){const d=new Date(iso),n=new Date();const diff=Math.floor((n-d)/86400000);if(diff===0)return'Hari ini';if(diff===1)return'Kemarin';if(diff<7)return diff+' hari lalu';return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}
+
+/* ═══════════════════════════════════════════════
+   GREETING & DATE
+═══════════════════════════════════════════════ */
+(function(){
+  const h=new Date().getHours();
+  document.getElementById('greeting').textContent=h<11?'Selamat Pagi! ☀️':h<15?'Selamat Siang! 🌤️':h<18?'Selamat Sore! 🌅':'Selamat Malam! 🌙';
+  const d=new Date();
+  document.getElementById('dateDisplay').textContent=`${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+})();
+
+/* ═══════════════════════════════════════════════
+   SAMPLE DATA SEED
+═══════════════════════════════════════════════ */
+function seedData(){
+  if(loadLS('si_seeded2',false))return;
+  const salesList=['Ahmad Fauzi','Budi Santoso','Siti Rahayu','Rudi Hakim'];
+  const custList=['PT Maju Bersama','CV Teknologi Indo','Toko Jaya Komputer','PT Global Tech','UD Sinar Mas','Bapak Hendra','CV Mandiri','PT Cahaya Digital','Ibu Sarah','PT Indo Gaming','CV Sukses Makmur','Toko Berkah','PT Nusantara IT','Bapak Rizky','CV Prima Tech','PT Duta Sarana','Toko Mulia','Ibu Dewi','CV Karya Maju','PT Abadi'];
+  const prodList=[
+    {name:'Intel i9 14900KF',price:7200000},{name:'Intel i7 14700KF',price:4800000},{name:'Intel i5 14600K',price:2900000},
+    {name:'AMD Ryzen 7 7800X3D',price:5800000},{name:'WD My Book 8TB',price:2700000},{name:'SSD Team MP44Q 2TB',price:4400000},
+    {name:'RAM Corsair 16GB DDR5',price:3900000},{name:'SOUL S-CANDY WHITE',price:95000},{name:'SOUL S-CANDY BLACK',price:95000},
+    {name:'Mousepad DA Carbon',price:25000},{name:'VDENMENV TD72L MIX',price:92000},{name:'MSI RTX 5060 8GB',price:5100000},
+    {name:'MSI RTX 3060 12GB',price:5900000},{name:'RAM Apacer NOX 32GB',price:1050000},{name:'WD My Passport 1TB',price:790000},
+    {name:'WD My Passport 2TB',price:985000},{name:'SSD Samsung 870 EVO',price:663000},{name:'LEXAR NS100 512GB',price:500000},
+    {name:'RYZEN 5 8400F',price:2120000},{name:'MSI B760M Gaming WiFi',price:1981000},
+  ];
+  const platforms=['tokopedia','shopee','tiktok','bli2','offline'];
+  const txns=[];
+  const today=new Date();
+  for(let d=89;d>=0;d--){
+    const dt=new Date(today);dt.setDate(today.getDate()-d);
+    if(dt.getDay()===0)continue;
+    const n=Math.floor(Math.random()*7)+3;
+    for(let i=0;i<n;i++){
+      const p=prodList[Math.floor(Math.random()*prodList.length)];
+      const qty=Math.floor(Math.random()*5)+1;
+      txns.push({
+        id:Date.now()+Math.random(),
+        date:dt.toISOString().split('T')[0],
+        salesName:salesList[Math.floor(Math.random()*salesList.length)],
+        customerName:custList[Math.floor(Math.random()*custList.length)],
+        productName:p.name,qty,
+        amount:Math.round(p.price*qty*(1+Math.random()*0.3-0.05)),
+        platform:platforms[Math.floor(Math.random()*platforms.length)]
+      });
+    }
+  }
+  saveLS('si_txns',txns);
+  const tgts={};
+  const yr=today.getFullYear(),mo=today.getMonth()+1,q=Math.ceil(mo/3);
+  salesList.forEach(s=>{
+    tgts[`${yr}-${mo}-${s}`]=150000000;
+    tgts[`${yr}-Q${q}-${s}`]=420000000;
+  });
+  tgts[`${yr}-${mo}-TOTAL`]=600000000;
+  tgts[`${yr}-Q${q}-TOTAL`]=1680000000;
+  saveLS('si_targets',tgts);
+  saveLS('si_seeded2',true);
+}
+
+/* ═══════════════════════════════════════════════
+   WORKING DAYS (Mon–Sat, Sunday off)
+═══════════════════════════════════════════════ */
+function isWD(d){return d.getDay()!==0}
+function countWD(start,end){
+  let c=0;const d=new Date(start);d.setHours(0,0,0,0);const e=new Date(end);e.setHours(23,59,59);
+  while(d<=e){if(isWD(d))c++;d.setDate(d.getDate()+1)}return c;
+}
+function monthWD(y,m){return countWD(new Date(y,m-1,1),new Date(y,m,0))}
+function elapsedMonthWD(y,m){
+  const start=new Date(y,m-1,1);
+  const end=new Date();end.setHours(23,59,59);
+  const mEnd=new Date(y,m,0);
+  return countWD(start,end<mEnd?end:mEnd);
+}
+function quarterBounds(y,q){return{start:new Date(y,(q-1)*3,1),end:new Date(y,q*3,0)}}
+function quarterWD(y,q){const b=quarterBounds(y,q);return countWD(b.start,b.end)}
+function elapsedQuarterWD(y,q){
+  const b=quarterBounds(y,q);
+  const end=new Date();end.setHours(23,59,59);
+  return countWD(b.start,end<b.end?end:b.end);
+}
+
+/* ═══════════════════════════════════════════════
+   TRANSACTION DATA
+═══════════════════════════════════════════════ */
+function getTxns(){return loadLS('si_txns',[])}
+function getTargets(){return loadLS('si_targets',{})}
+
+function filterTxns(txns,{year,month,quarter,sales}={}){
+  return txns.filter(t=>{
+    const d=new Date(t.date);
+    const tMo=d.getMonth()+1;
+    if(year&&d.getFullYear()!==parseInt(year))return false;
+    /* quarter filter — takes precedence over month if set */
+    if(quarter&&parseInt(quarter)>0){
+      const qMos=quarterMonths(parseInt(quarter));
+      if(!qMos.includes(tMo))return false;
+    } else if(month&&month!=='0'&&tMo!==parseInt(month))return false;
+    if(sales&&t.salesName!==sales)return false;
+    return true;
+  });
+}
+
+function getDateRange(period){
+  const now=new Date();now.setHours(0,0,0,0);
+  if(period==='today'){
+    const e=new Date(now);e.setHours(23,59,59);
+    return{start:now,end:e};
+  }
+  if(period==='week'){
+    const day=now.getDay();const diff=day===0?6:day-1;
+    const mon=new Date(now);mon.setDate(now.getDate()-diff);
+    const sat=new Date(mon);sat.setDate(mon.getDate()+5);sat.setHours(23,59,59);
+    return{start:mon,end:sat};
+  }
+  if(period==='month'){
+    const start=new Date(now.getFullYear(),now.getMonth(),1);
+    const end=new Date(now.getFullYear(),now.getMonth()+1,0);end.setHours(23,59,59);
+    return{start,end};
+  }
+  return null;
+}
+
+function txnsInPeriod(txns,period){
+  const r=getDateRange(period);if(!r)return txns;
+  return txns.filter(t=>{const d=new Date(t.date);return d>=r.start&&d<=r.end});
+}
+
+/* ═══════════════════════════════════════════════
+   FILTERS & YEAR SELECT INIT
+═══════════════════════════════════════════════ */
+let pencView='sales';
+let topcustPeriod='today';
+let topprodPeriod='today';
+let trendChart=null;
+
+function initFilters(){
+  const txns=getTxns();
+  /* Year dropdown — from transaction data */
+  const years=[...new Set(txns.map(t=>new Date(t.date).getFullYear()))].sort((a,b)=>b-a);
+  const yrSel=document.getElementById('sf-year');
+  yrSel.innerHTML='';
+  years.forEach(y=>{const o=document.createElement('option');o.value=y;o.textContent=y;yrSel.appendChild(o)});
+  if(!years.length){const o=document.createElement('option');o.value=new Date().getFullYear();o.textContent=new Date().getFullYear();yrSel.appendChild(o)}
+  /* Reset quarter to "Semua" and set month to current */
+  document.getElementById('sf-quarter').value='0';
+  document.getElementById('sf-month').value=new Date().getMonth()+1;
+  /* Sales dropdown — from SALES_ACCOUNTS (registered accounts) */
+  const sSel=document.getElementById('sf-salesperson');
+  sSel.innerHTML=salesOptsHTML(true,'Semua Sales');
+  /* Set Target modal defaults */
+  document.getElementById('tgt-year').value=new Date().getFullYear();
+  document.getElementById('tgt-month').value=new Date().getMonth()+1;
+  document.getElementById('tgt-quarter').value=Math.ceil((new Date().getMonth()+1)/3);
+  /* Populate tgt-sales dropdown */
+  const tgtSalesSel=document.getElementById('tgt-sales');
+  if(tgtSalesSel){
+    tgtSalesSel.innerHTML='<option value="">— Semua Sales (TOTAL) —</option>';
+    SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;tgtSalesSel.appendChild(o)});
+  }
+  /* Populate txn-sales dropdown */
+  const txnSalesSel=document.getElementById('txn-sales');
+  if(txnSalesSel){
+    txnSalesSel.innerHTML='<option value="">— Pilih Sales —</option>';
+    SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;txnSalesSel.appendChild(o)});
+  }
+}
+
+/* Quarter–Month interlock for Sales filter bar */
+function onYearChange(){ refreshSales(); }
+
+function onQuarterChange(){
+  const q=parseInt(document.getElementById('sf-quarter').value);
+  /* When quarter is chosen, reset month to "Semua" */
+  if(q>0) document.getElementById('sf-month').value='0';
+  refreshSales();
+}
+
+function onMonthChange(){
+  const mo=parseInt(document.getElementById('sf-month').value);
+  /* When specific month chosen, sync quarter accordingly; if "Semua Bulan" reset quarter */
+  if(mo>0){
+    document.getElementById('sf-quarter').value=Math.ceil(mo/3);
+  } else {
+    document.getElementById('sf-quarter').value='0';
+  }
+  refreshSales();
+}
+
+/* Quarter–Month interlock for Set Target modal */
+function onTgtQuarterChange(){
+  const q=parseInt(document.getElementById('tgt-quarter').value);
+  if(q>0){
+    /* Set month to first month of selected quarter */
+    document.getElementById('tgt-month').value=(q-1)*3+1;
+  }
+}
+
+function getSF(){
+  return{
+    year:document.getElementById('sf-year').value,
+    month:document.getElementById('sf-month').value,
+    quarter:document.getElementById('sf-quarter').value,
+    sales:document.getElementById('sf-salesperson').value
+  };
+}
+
+function refreshSales(){
+  renderPencapaian();
+  renderTopCust(topcustPeriod);
+  renderTopProd(topprodPeriod);
+  renderProyeksi();
+}
+
+/* ═══════════════════════════════════════════════
+   PANEL: PENCAPAIAN
+═══════════════════════════════════════════════ */
+function renderPencapaian(){
+  const sf=getSF();
+  const all=getTxns();
+  const tgts=getTargets();
+  const now=new Date();
+  const yr=parseInt(sf.year)||now.getFullYear();
+  /* Determine effective month and quarter based on filter selection */
+  const sfQ=parseInt(sf.quarter)||0;
+  const sfMo=parseInt(sf.month)||0;
+  /* If quarter selected and no specific month → use quarter; if month selected → derive quarter from month */
+  const q = sfQ>0 ? sfQ : (sfMo>0 ? Math.ceil(sfMo/3) : Math.ceil((now.getMonth()+1)/3));
+  const mo = sfMo>0 ? sfMo : (sfQ>0 ? (sfQ-1)*3+1 : now.getMonth()+1);
+
+  const todayTxns=all.filter(t=>t.date===todayStr()&&(!sf.sales||t.salesName===sf.sales));
+  const todayAmt=todayTxns.reduce((s,t)=>s+t.amount,0);
+
+  /* Monthly txns: if quarter mode with no specific month, show all months in quarter */
+  let moTxns;
+  if(sfQ>0&&sfMo===0){
+    /* Quarter filter active, no specific month — aggregate whole quarter for "bulan" display */
+    const qMos=quarterMonths(sfQ);
+    moTxns=all.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&qMos.includes(d.getMonth()+1)&&(!sf.sales||t.salesName===sf.sales)});
+  } else {
+    moTxns=all.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(d.getMonth()+1)===mo&&(!sf.sales||t.salesName===sf.sales)});
+  }
+  const moAmt=moTxns.reduce((s,t)=>s+t.amount,0);
+  const moKey=sf.sales?`${yr}-${mo}-${sf.sales}`:`${yr}-${mo}-TOTAL`;
+  const moTarget=tgts[moKey]||0;
+
+  const qTxns=all.filter(t=>{const d=new Date(t.date);const tq=Math.ceil((d.getMonth()+1)/3);return d.getFullYear()===yr&&tq===q&&(!sf.sales||t.salesName===sf.sales)});
+  const qAmt=qTxns.reduce((s,t)=>s+t.amount,0);
+  const qKey=sf.sales?`${yr}-Q${q}-${sf.sales}`:`${yr}-Q${q}-TOTAL`;
+  const qTarget=tgts[qKey]||0;
+
+  const moP=pct(moAmt,moTarget);const qP=pct(qAmt,qTarget);
+  const moLabel=sfQ>0&&sfMo===0?`Q${q} ${yr}`:`Bulan ${MONTHS_ID[mo-1]} ${yr}`;
+  document.getElementById('penc-summary').innerHTML=`
+    <div class="sum-card">
+      <div class="sum-sub">Hari Ini (${todayStr()})</div>
+      <div class="sum-main">${idr(todayAmt)}</div>
+      <div class="sum-sub">${todayTxns.length} transaksi</div>
+    </div>
+    <div class="sum-card">
+      <div class="sum-sub">${moLabel} ${moTarget?'vs Target':''}</div>
+      <div class="sum-main">${idr(moAmt)}</div>
+      ${moTarget?`<div class="sum-pct ${pctColor(moP)}">${moP}% dari ${idr(moTarget)}</div><div class="prog-wrap"><div class="prog-label"><span>${idr(moAmt)}</span><span>${idr(moTarget)}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(moP,100)}%;background:${moP>=100?'#2e7d32':moP>=70?'#f57f17':'#0f3460'}"></div></div></div>`:'<div class="sum-sub">Belum ada target</div>'}
+    </div>
+    <div class="sum-card">
+      <div class="sum-sub">Q${q} ${yr} ${qTarget?'vs Target':''}</div>
+      <div class="sum-main">${idr(qAmt)}</div>
+      ${qTarget?`<div class="sum-pct ${pctColor(qP)}">${qP}% dari ${idr(qTarget)}</div><div class="prog-wrap"><div class="prog-label"><span>${idr(qAmt)}</span><span>${idr(qTarget)}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(qP,100)}%;background:${qP>=100?'#2e7d32':qP>=70?'#f57f17':'#0f3460'}"></div></div></div>`:'<div class="sum-sub">Belum ada target</div>'}
+    </div>`;
+
+  renderPencTable(moTxns,tgts,yr,mo,sf);
+  renderTrendChart(all,sf,yr);
+}
+
+function renderPencTable(moTxns,tgts,yr,mo,sf){
+  const el=document.getElementById('penc-table');
+  if(pencView==='sales'){
+    document.getElementById('penc-table-title').textContent='Detail per Sales';
+    const grouped={};
+    moTxns.forEach(t=>{grouped[t.salesName]=(grouped[t.salesName]||0)+t.amount});
+    const rows=Object.entries(grouped).sort((a,b)=>b[1]-a[1]);
+    if(!rows.length){el.innerHTML='<div class="empty-state">Tidak ada data untuk periode ini.</div>';return}
+    el.innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Sales Name</th><th>Penjualan Bulan Ini</th><th>Target Bulanan</th><th>Pencapaian</th><th>Progress</th></tr></thead><tbody>`+
+      rows.map(([name,amt],i)=>{
+        const tKey=`${yr}-${mo}-${name}`;const tgt=tgts[tKey]||0;const p=pct(amt,tgt);
+        const fillColor=p>=100?'#2e7d32':p>=70?'#f57f17':'#c62828';
+        return`<tr><td><span class="rank-badge${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td class="amt">${escH(name)}</td><td class="amt">${idr(amt)}</td><td>${tgt?idr(tgt):'<span style="color:#ccc">–</span>'}</td><td class="${pctColor(p)} amt">${tgt?p+'%':'–'}</td><td style="min-width:100px"><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(p,100)}%;background:${fillColor}"></div></div></td></tr>`;
+      }).join('')+'</tbody></table>';
+  }else{
+    document.getElementById('penc-table-title').textContent='Detail per Customer';
+    const grouped={};
+    moTxns.forEach(t=>{
+      if(!grouped[t.customerName])grouped[t.customerName]={amt:0,txn:0,sales:new Set()};
+      grouped[t.customerName].amt+=t.amount;
+      grouped[t.customerName].txn++;
+      grouped[t.customerName].sales.add(t.salesName);
+    });
+    const rows=Object.entries(grouped).sort((a,b)=>b[1].amt-a[1].amt);
+    if(!rows.length){el.innerHTML='<div class="empty-state">Tidak ada data untuk periode ini.</div>';return}
+    el.innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Customer Name</th><th>Total Pembelian</th><th>Transaksi</th><th>Sales</th></tr></thead><tbody>`+
+      rows.map(([name,d],i)=>`<tr><td><span class="rank-badge${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td class="amt">${escH(name)}</td><td class="amt">${idr(d.amt)}</td><td>${d.txn}x</td><td style="font-size:11px;color:#888">${[...d.sales].join(', ')}</td></tr>`).join('')+
+      '</tbody></table>';
+  }
+}
+
+function renderTrendChart(all,sf,yr){
+  const ctx=document.getElementById('trend-chart').getContext('2d');
+  if(trendChart){trendChart.destroy()}
+  const months=Array.from({length:12},(_,i)=>i+1);
+  const data=months.map(m=>{
+    return all.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(d.getMonth()+1)===m&&(!sf.sales||t.salesName===sf.sales)}).reduce((s,t)=>s+t.amount,0);
+  });
+  const tgts=getTargets();
+  const tgtData=months.map(m=>{const k=sf.sales?`${yr}-${m}-${sf.sales}`:`${yr}-${m}-TOTAL`;return tgts[k]||null});
+  trendChart=new Chart(ctx,{type:'bar',data:{
+    labels:['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'],
+    datasets:[
+      {label:'Penjualan',data:data,backgroundColor:'rgba(15,52,96,0.75)',borderRadius:5},
+      {label:'Target',data:tgtData,type:'line',borderColor:'#e65100',borderDash:[4,3],pointRadius:3,fill:false,tension:0.3}
+    ]
+  },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11}}}},scales:{y:{ticks:{callback:v=>v>=1e6?'Rp '+(v/1e6).toFixed(0)+'jt':idr(v),font:{size:10}},grid:{color:'#f0f0f6'}},x:{ticks:{font:{size:10}},grid:{display:false}}}}});
+}
+
+function setPencView(el,view){
+  document.querySelectorAll('.vtog').forEach(v=>v.classList.remove('active'));
+  el.classList.add('active');pencView=view;
+  const sf=getSF();
+  const all=getTxns();const tgts=getTargets();const now=new Date();
+  const yr=parseInt(sf.year)||now.getFullYear();const mo=parseInt(sf.month)||now.getMonth()+1;
+  const moTxns=all.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(d.getMonth()+1)===mo&&(!sf.sales||t.salesName===sf.sales)});
+  renderPencTable(moTxns,tgts,yr,mo,sf);
+}
+
+/* ═══════════════════════════════════════════════
+   PANEL: TOP CUSTOMER & TOP PRODUK
+═══════════════════════════════════════════════ */
+function setTopPeriod(el,panel,period){
+  const row=el.parentElement;row.querySelectorAll('.ptog').forEach(p=>p.classList.remove('active'));el.classList.add('active');
+  const periodLabel={today:'Hari Ini',week:'Minggu Ini',month:'Bulan Ini'};
+  if(panel==='topcust'){topcustPeriod=period;document.getElementById('topcust-title').textContent=`Top 20 Customer — ${periodLabel[period]}`;renderTopCust(period);}
+  else{topprodPeriod=period;document.getElementById('topprod-title').textContent=`Top 20 Produk — ${periodLabel[period]}`;renderTopProd(period);}
+}
+
+function renderTopCust(period){
+  const sf=getSF();let txns=getTxns();
+  txns=txns.filter(t=>{const d=new Date(t.date);return d.getFullYear()===parseInt(sf.year)&&(!sf.sales||t.salesName===sf.sales)});
+  txns=txnsInPeriod(txns,period);
+  const grouped={};
+  txns.forEach(t=>{if(!grouped[t.customerName])grouped[t.customerName]={amt:0,txn:0,sales:new Set()};grouped[t.customerName].amt+=t.amount;grouped[t.customerName].txn++;grouped[t.customerName].sales.add(t.salesName)});
+  const rows=Object.entries(grouped).sort((a,b)=>b[1].amt-a[1].amt).slice(0,20);
+  const el=document.getElementById('topcust-table');
+  if(!rows.length){el.innerHTML='<div class="empty-state">Tidak ada data untuk periode ini.</div>';return}
+  const max=rows[0][1].amt;
+  el.innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Customer Name</th><th>Total</th><th>Qty Transaksi</th><th>Sales</th><th>Share</th></tr></thead><tbody>`+
+    rows.map(([name,d],i)=>`<tr><td><span class="rank-badge${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td style="font-weight:600">${escH(name)}</td><td class="amt">${idr(d.amt)}</td><td>${d.txn}x</td><td style="font-size:11px;color:#888">${[...d.sales].join(', ')}</td><td style="min-width:90px"><div class="prog-bar" style="margin-top:2px"><div class="prog-fill" style="width:${pct(d.amt,max)}%;background:#0f3460"></div></div><div style="font-size:10px;color:#aaa;margin-top:2px">${pct(d.amt,max)}%</div></td></tr>`).join('')+
+    '</tbody></table>';
+}
+
+function renderTopProd(period){
+  const sf=getSF();let txns=getTxns();
+  txns=txns.filter(t=>{const d=new Date(t.date);return d.getFullYear()===parseInt(sf.year)&&(!sf.sales||t.salesName===sf.sales)});
+  txns=txnsInPeriod(txns,period);
+  const grouped={};
+  txns.forEach(t=>{if(!grouped[t.productName])grouped[t.productName]={amt:0,qty:0};grouped[t.productName].amt+=t.amount;grouped[t.productName].qty+=t.qty});
+  const rows=Object.entries(grouped).sort((a,b)=>b[1].amt-a[1].amt).slice(0,20);
+  const el=document.getElementById('topprod-table');
+  if(!rows.length){el.innerHTML='<div class="empty-state">Tidak ada data untuk periode ini.</div>';return}
+  const max=rows[0][1].amt;
+  el.innerHTML=`<table class="data-table"><thead><tr><th>#</th><th>Nama Produk</th><th>Total Revenue</th><th>Total Qty</th><th>Share</th></tr></thead><tbody>`+
+    rows.map(([name,d],i)=>`<tr><td><span class="rank-badge${i===0?' gold':i===1?' silver':i===2?' bronze':''}">${i+1}</span></td><td style="font-weight:600">${escH(name)}</td><td class="amt">${idr(d.amt)}</td><td>${d.qty} pcs</td><td style="min-width:90px"><div class="prog-bar" style="margin-top:2px"><div class="prog-fill" style="width:${pct(d.amt,max)}%;background:#7c4dff"></div></div><div style="font-size:10px;color:#aaa;margin-top:2px">${pct(d.amt,max)}%</div></td></tr>`).join('')+
+    '</tbody></table>';
+}
+
+/* ═══════════════════════════════════════════════
+   PANEL: PROYEKSI
+═══════════════════════════════════════════════ */
+function renderProyeksi(){
+  const sf=getSF();const now=new Date();
+  const yr=parseInt(sf.year)||now.getFullYear();
+  const mo=now.getMonth()+1;
+  const q=Math.ceil(mo/3);
+  const all=getTxns();
+  const tgts=getTargets();
+
+  const moTxns=all.filter(t=>{const d=new Date(t.date);return d.getFullYear()===yr&&(d.getMonth()+1)===mo&&(!sf.sales||t.salesName===sf.sales)});
+  const moSTD=moTxns.reduce((s,t)=>s+t.amount,0);
+  const moTotalWD=monthWD(yr,mo);
+  const moElapsed=elapsedMonthWD(yr,mo);
+  const moRemaining=moTotalWD-moElapsed;
+  const moProjected=moElapsed?Math.round(moSTD/moElapsed*moTotalWD):0;
+  const moKey=sf.sales?`${yr}-${mo}-${sf.sales}`:`${yr}-${mo}-TOTAL`;
+  const moTarget=tgts[moKey]||0;
+  const moProjPct=pct(moProjected,moTarget);
+
+  const qTxns=all.filter(t=>{const d=new Date(t.date);const tq=Math.ceil((d.getMonth()+1)/3);return d.getFullYear()===yr&&tq===q&&(!sf.sales||t.salesName===sf.sales)});
+  const qSTD=qTxns.reduce((s,t)=>s+t.amount,0);
+  const qTotalWD=quarterWD(yr,q);
+  const qElapsed=elapsedQuarterWD(yr,q);
+  const qRemaining=qTotalWD-qElapsed;
+  const qProjected=qElapsed?Math.round(qSTD/qElapsed*qTotalWD):0;
+  const qKey=sf.sales?`${yr}-Q${q}-${sf.sales}`:`${yr}-Q${q}-TOTAL`;
+  const qTarget=tgts[qKey]||0;
+  const qProjPct=pct(qProjected,qTarget);
+
+  document.getElementById('proj-cards').innerHTML=`
+    <div class="proj-card">
+      <div class="proj-title">📅 Proyeksi Akhir Bulan ${MONTHS_ID[mo-1]} ${yr}</div>
+      <div class="proj-val">${idr(moProjected)}</div>
+      <div class="proj-meta">Sales to date: ${idr(moSTD)}<br>Hari kerja aktif: ${moElapsed} / ${moTotalWD} hari<br>Sisa hari kerja: ${moRemaining} hari</div>
+      ${moTarget?`<div class="prog-wrap" style="margin-top:10px"><div class="prog-label"><span class="${pctColor(moProjPct)}" style="font-weight:700">${moProjPct}% dari target</span><span>${idr(moTarget)}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(moProjPct,100)}%;background:${moProjPct>=100?'#2e7d32':moProjPct>=70?'#f57f17':'#c62828'}"></div></div></div>`:''}
+    </div>
+    <div class="proj-card">
+      <div class="proj-title">📊 Proyeksi Akhir Q${q} ${yr}</div>
+      <div class="proj-val">${idr(qProjected)}</div>
+      <div class="proj-meta">Sales to date: ${idr(qSTD)}<br>Hari kerja aktif: ${qElapsed} / ${qTotalWD} hari<br>Sisa hari kerja: ${qRemaining} hari</div>
+      ${qTarget?`<div class="prog-wrap" style="margin-top:10px"><div class="prog-label"><span class="${pctColor(qProjPct)}" style="font-weight:700">${qProjPct}% dari target</span><span>${idr(qTarget)}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min(qProjPct,100)}%;background:${qProjPct>=100?'#2e7d32':qProjPct>=70?'#f57f17':'#c62828'}"></div></div></div>`:''}
+    </div>`;
+
+  document.getElementById('proj-detail').innerHTML=`
+    <div class="info-row"><span class="info-key">Rumus Proyeksi</span><span class="info-val">STD ÷ Hari Kerja Dilalui × Total Hari Kerja</span></div>
+    <div class="info-row"><span class="info-key">Hari Kerja</span><span class="info-val">Senin–Sabtu (Minggu libur)</span></div>
+    <div class="info-row"><span class="info-key">Bulan ${MONTHS_ID[mo-1]} — STD</span><span class="info-val">${idr(moSTD)} (${moElapsed} hari kerja)</span></div>
+    <div class="info-row"><span class="info-key">Bulan ${MONTHS_ID[mo-1]} — Proyeksi</span><span class="info-val">${idr(moSTD)} ÷ ${moElapsed} × ${moTotalWD} = ${idr(moProjected)}</span></div>
+    <div class="info-row"><span class="info-key">Q${q} ${yr} — STD</span><span class="info-val">${idr(qSTD)} (${qElapsed} hari kerja)</span></div>
+    <div class="info-row"><span class="info-key">Q${q} ${yr} — Proyeksi</span><span class="info-val">${idr(qSTD)} ÷ ${qElapsed} × ${qTotalWD} = ${idr(qProjected)}</span></div>`;
+}
+
+/* ═══════════════════════════════════════════════
+   MODALS
+═══════════════════════════════════════════════ */
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+function closeModalIf(e,id){if(e.target===document.getElementById(id))closeModal(id)}
+
+function submitTxn(){
+  const date=document.getElementById('txn-date').value;
+  const salesSel=document.getElementById('txn-sales');
+  const sales=salesSel.value.trim();
+  const customer=document.getElementById('txn-customer').value.trim();
+  const product=document.getElementById('txn-product').value.trim();
+  const qty=parseInt(document.getElementById('txn-qty').value)||1;
+  const amount=parseFloat(document.getElementById('txn-amount').value)||0;
+  if(!date||!sales||!customer||!product||!amount){
+    alert('Lengkapi semua field wajib (*)');return;
+  }
+  const newTxn={id:Date.now(),date,salesName:sales,customerName:customer,productName:product,qty,amount,platform:document.getElementById('txn-platform').value,inputAt:new Date().toISOString(),inputBy:currentUser||''};
+  const txns=getTxns();
+  txns.push(newTxn);
+  saveLS('si_txns',txns);
+  /* sync to Sheets — push semua txns (bukan hanya satu) agar tidak ada yang hilang */
+  pushAllTxnsToSheets();
+  /* Catat ke activity log */
+  addActivityLog({action:'add_txn', data:newTxn, desc:`Input transaksi ${newTxn.customerName} · ${idr(newTxn.amount)}`});
+  /* Reset form */
+  salesSel.value='';
+  ['txn-customer','txn-product','txn-qty','txn-amount'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('txn-date').value=todayStr();
+  /* Show success flash, then auto-close */
+  const ok=document.getElementById('txn-success');
+  ok.style.display='block';
+  setTimeout(()=>{
+    ok.style.display='none';
+    closeModal('modal-txn');
+    initFilters();refreshSales();
+  },1200);
+}
+
+function submitTarget(){
+  const yr=parseInt(document.getElementById('tgt-year').value);
+  const mo=parseInt(document.getElementById('tgt-month').value)||0;
+  const selQ=parseInt(document.getElementById('tgt-quarter').value)||0;
+  const salesEl=document.getElementById('tgt-sales');
+  const sales=(salesEl?salesEl.value.trim():'')||'TOTAL';
+  const monthly=parseFloat(document.getElementById('tgt-monthly').value)||0;
+  const quarterly=parseFloat(document.getElementById('tgt-quarterly').value)||0;
+  if(!yr){alert('Isi tahun terlebih dahulu');return}
+  if(!mo&&!quarterly){alert('Isi bulan atau target quarterly');return}
+  const tgts=getTargets();
+  /* Save monthly target if month is specified */
+  if(mo>0&&monthly>0){
+    tgts[`${yr}-${mo}-${sales}`]=monthly;
+    apiPost({action:'setTarget',key:`${yr}-${mo}-${sales}`,value:monthly})
+      .then(ok=>showSyncBadge(ok?'ok':'err'));
+  }
+  /* Save quarterly target */
+  if(quarterly>0){
+    const q=selQ>0?selQ:(mo>0?Math.ceil(mo/3):0);
+    if(q>0){
+      tgts[`${yr}-Q${q}-${sales}`]=quarterly;
+      apiPost({action:'setTarget',key:`${yr}-Q${q}-${sales}`,value:quarterly});
+    }
+  }
+  if(!mo&&!quarterly){alert('Isi minimal target bulanan atau target quarterly');return}
+  saveLS('si_targets',tgts);
+  renderTargetList();refreshSales();
+  /* Show success flash, then auto-close */
+  const okEl=document.getElementById('tgt-success');
+  if(okEl){
+    okEl.style.display='block';
+    setTimeout(()=>{
+      okEl.style.display='none';
+      closeModal('modal-target');
+    },1500);
+  } else {
+    closeModal('modal-target');
+  }
+}
+
+function renderTargetList(){
+  const tgts=getTargets();
+  const el=document.getElementById('tgt-list');
+  const entries=Object.entries(tgts).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,10);
+  if(!entries.length){el.innerHTML='<div style="color:#ccc;font-size:12px">Belum ada target.</div>';return}
+  el.innerHTML=entries.map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f5f5f9"><span style="color:#666">${k}</span><span style="font-weight:700">${idr(v)}</span></div>`).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════ */
+function switchMain(el,name){
+  document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.msection').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='sales'){initFilters();refreshSales()}
+}
+
+function switchSub(el,name){
+  document.querySelectorAll('#tab-jadwal .sub-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#tab-jadwal .sub-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');document.getElementById('panel-'+name).classList.add('active');
+  if(name==='week')renderWeek();
+  if(name==='skor')renderSkor();
+  if(name==='tomorrow')renderPromos();
+}
+
+function switchSalesPanel(el,name){
+  document.querySelectorAll('#tab-sales .sub-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#tab-sales .sub-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');document.getElementById('sp-'+name).classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════
+   JADWAL: DIVISIONS / TASKS
+═══════════════════════════════════════════════ */
+function getTasks(scope,divKey){return loadLS(`si_tasks_${scope}_${divKey}`,[])}
+function saveTasks(scope,divKey,arr){saveLS(`si_tasks_${scope}_${divKey}`,arr)}
+
+/* Done status disimpan langsung di task (shared, tersync ke semua browser via Sheets) */
+function getTasksWithUserDone(scope,divKey){
+  /* Alias getTasks — done sudah ada di dalam task itu sendiri */
+  return getTasks(scope,divKey);
+}
+
+function renderTasksSection(scope,containerId){
+  const wrap=document.getElementById(containerId);wrap.innerHTML='';
+  const isMgrOrAbove=(currentRole==='master'||currentRole==='manager');
+  const isStaff=(currentRole==='staff');
+  const myDiv=DIV_FOR_ROLE[currentUser]||null; /* divisi milik staff yg login */
+
+  DIVISIONS.forEach(div=>{
+    /* Staff hanya lihat divisi mereka sendiri */
+    if(isStaff && myDiv && myDiv!==div.key) return;
+
+    const tasks=getTasksWithUserDone(scope,div.key);
+    const done=tasks.filter(t=>t.done).length;
+    const p=tasks.length?Math.round(done/tasks.length*100):0;
+
+    /* Hanya manager/master yang bisa tambah task */
+    const canAdd=isMgrOrAbove;
+    /* Hanya manager/master yang bisa hapus task */
+    const canDel=isMgrOrAbove;
+    /* Hanya manager/master yang bisa edit task */
+    const canEdit=isMgrOrAbove;
+
+    const addRowHTML=canAdd
+      ?`<div class="add-row"><input class="add-input" id="ai-${scope}-${div.key}" placeholder="Tambah task baru..." onkeydown="if(event.key==='Enter')addTask('${scope}','${div.key}')"><button class="add-btn" onclick="addTask('${scope}','${div.key}')">+ Tambah</button></div>`
+      :`<div class="view-only-msg">🔒 Hanya bisa lihat & ceklist tugas yang diberikan Manager.</div>`;
+
+    const card=document.createElement('div');card.className='div-card';
+    card.innerHTML=`<div class="div-header" style="background:${div.color}" onclick="toggleDiv(this)"><div class="div-title"><span>${div.icon} ${div.label}</span><span class="div-count">${done}/${tasks.length}</span></div><span class="div-chevron open">▼</span></div>
+    <div class="div-body open"><div class="prog-wrap"><div class="prog-info"><span>${p}% selesai</span><span>${tasks.length-done} tersisa</span></div><div class="prog-bar"><div class="prog-fill" style="width:${p}%;background:${div.color}"></div></div></div>
+    <div class="task-list" id="tl-${scope}-${div.key}">${renderTaskItems(scope,div.key,tasks,canEdit,canDel)}</div>
+    ${addRowHTML}</div>`;
+    wrap.appendChild(card);
+  });
+  if(scope==='today')updateTodoSummary();
+}
+
+function renderTaskItems(scope,divKey,tasks,canEdit,canDel){
+  if(!tasks.length)return`<div class="task-empty">Belum ada task untuk divisi ini.</div>`;
+  return tasks.map((t,i)=>`<div class="task-item" id="ti-${scope}-${divKey}-${i}">
+    <input type="checkbox" class="task-cb" ${t.done?'checked':''} onchange="toggleTask('${scope}','${divKey}',${i},this.checked)">
+    <span class="task-text${t.done?' done':''}">${escH(t.text)}</span>
+    ${canEdit?`<button class="task-edit-btn" onclick="openEditTask('${scope}','${divKey}',${i})" title="Edit task">✏️</button>`:''}
+    ${canDel?`<button class="task-del" onclick="deleteTask('${scope}','${divKey}',${i})">✕</button>`:''}
+  </div>`).join('');
+}
+
+function addTask(scope,divKey){
+  /* Hanya manager/master yang boleh tambah task */
+  if(currentRole!=='master'&&currentRole!=='manager'){
+    alert('Hanya Manager atau Master yang bisa menambah task.');return;
+  }
+  const inp=document.getElementById(`ai-${scope}-${divKey}`);
+  const text=inp.value.trim();if(!text)return;
+  const newTask={id:Date.now(),text,done:false};
+  const tasks=getTasks(scope,divKey);tasks.push(newTask);saveTasks(scope,divKey,tasks);inp.value='';
+  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets tidak menumpuk duplikat */
+  pushAllTasksToSheets();
+  const containerId=scope==='today'?'todo-divisions':'week-divisions';
+  renderTasksSection(scope,containerId);
+}
+
+function toggleTask(scope,divKey,idx,checked){
+  /* Done disimpan langsung di task (bukan per-user) agar tersync ke semua browser */
+  const tasks=getTasks(scope,divKey);
+  if(!tasks[idx]) return;
+  tasks[idx].done=checked;
+  saveTasks(scope,divKey,tasks);
+  /* Daftarkan ke _pendingDone — in-memory, prioritas tertinggi saat merge sync */
+  _pendingDone[String(tasks[idx].id)] = checked;
+  /* Push ke Sheets agar master/manager langsung lihat update ceklist */
+  pushAllTasksToSheets();
+  const span=document.querySelector(`#ti-${scope}-${divKey}-${idx} .task-text`);
+  if(span)span.className='task-text'+(checked?' done':'');
+  if(scope==='today')updateTodoSummary();
+  const allTasks=getTasks(scope,divKey);
+  const done=allTasks.filter(t=>t.done).length;const p=allTasks.length?Math.round(done/allTasks.length*100):0;
+  const card=document.querySelector(`#ti-${scope}-${divKey}-${idx}`)?.closest('.div-card');
+  if(card){card.querySelector('.div-count').textContent=`${done}/${allTasks.length}`;card.querySelector('.prog-fill').style.width=p+'%';card.querySelector('.prog-info').innerHTML=`<span>${p}% selesai</span><span>${allTasks.length-done} tersisa</span>`}
+}
+
+function deleteTask(scope,divKey,idx){
+  const tasks=getTasks(scope,divKey);
+  tasks.splice(idx,1);saveTasks(scope,divKey,tasks);
+  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets bersih */
+  pushAllTasksToSheets();
+  if(scope==='today') renderTasksSection(scope,'todo-divisions');
+  else if(scope==='tomorrow') renderPromos();
+  else renderTasksSection(scope,'week-divisions');
+}
+function updateTodoSummary(){let total=0,done=0;DIVISIONS.forEach(d=>{const t=getTasksWithUserDone('today',d.key);total+=t.length;done+=t.filter(x=>x.done).length});document.getElementById('s-total').textContent=total;document.getElementById('s-done').textContent=done;document.getElementById('s-left').textContent=total-done}
+function toggleDiv(header){const body=header.nextElementSibling;const chev=header.querySelector('.div-chevron');const open=body.classList.toggle('open');chev.classList.toggle('open',open)}
+
+/* ═══════════════════════════════════════════════
+   JADWAL: WEEK STRATEGY
+═══════════════════════════════════════════════ */
+function renderWeek(){
+  const wrap=document.getElementById('week-divisions');
+  wrap.dataset.built='0'; /* selalu rebuild agar filter role tepat */
+  wrap.innerHTML='';
+  const isMgrOrAbove=(currentRole==='master'||currentRole==='manager');
+  const isStaff=(currentRole==='staff');
+  const myDiv=DIV_FOR_ROLE[currentUser]||null;
+
+  DIVISIONS.forEach(div=>{
+    /* Staff hanya lihat divisi mereka sendiri */
+    if(isStaff && myDiv && myDiv!==div.key) return;
+
+    const saved=loadLS(`si_strategy_${div.key}`,'');
+    const card=document.createElement('div');card.className='div-card';
+
+    const bodyContent = isMgrOrAbove
+      /* Manager/Master: bisa edit & simpan */
+      ? `<div style="font-size:11px;color:#aaa;margin-bottom:7px">Target, strategi, dan fokus minggu depan untuk divisi ini:</div>
+         <textarea class="strategy-area" id="strat-${div.key}" placeholder="Contoh: Target 500 pcs, promo gajian, follow-up 10 customer baru...">${escH(saved)}</textarea>
+         <div style="display:flex;align-items:center;gap:6px;margin-top:7px"><button class="save-mini-btn" onclick="saveStrategy('${div.key}')">💾 Simpan</button><span class="save-ok" id="strat-ok-${div.key}">✅ Tersimpan!</span></div>`
+      /* Staff: hanya lihat (readonly) */
+      : `<div style="font-size:11px;color:#aaa;margin-bottom:7px">Strategi minggu depan dari Manager:</div>
+         <div style="background:#f8f9ff;border-radius:8px;padding:12px;font-size:13px;color:#1a1a2e;min-height:60px;white-space:pre-wrap">${escH(saved)||'<span style="color:#aaa;font-style:italic">Belum ada strategi dari Manager.</span>'}</div>`;
+
+    card.innerHTML=`<div class="div-header" style="background:${div.color}" onclick="toggleDiv(this)"><div class="div-title"><span>${div.icon} ${div.label}</span></div><span class="div-chevron open">▼</span></div>
+    <div class="div-body open">${bodyContent}</div>`;
+    wrap.appendChild(card);
+  });
+  wrap.dataset.built='1';updateCarryTip();
+}
+
+function saveStrategy(divKey){const val=document.getElementById(`strat-${divKey}`).value;saveLS(`si_strategy_${divKey}`,val);const ok=document.getElementById(`strat-ok-${divKey}`);ok.style.display='inline';setTimeout(()=>ok.style.display='none',2000)}
+
+function updateCarryTip(){
+  const incomplete=[];
+  DIVISIONS.forEach(div=>{getTasksWithUserDone('today',div.key).filter(t=>!t.done).forEach(t=>incomplete.push(`${div.icon} ${t.text}`))});
+  const tip=document.getElementById('carry-tip');
+  if(incomplete.length){tip.style.display='';document.getElementById('carry-list').innerHTML='<ul style="margin:6px 0 0 16px">'+incomplete.slice(0,8).map(s=>`<li style="margin-bottom:3px">${escH(s)}</li>`).join('')+(incomplete.length>8?`<li style="color:#aaa">...dan ${incomplete.length-8} lainnya</li>`:'')+' </ul>'}
+  else tip.style.display='none';
+}
+
+/* ═══════════════════════════════════════════════
+   JADWAL: FOLLOW-UP
+═══════════════════════════════════════════════ */
+function getFollowups(){return loadLS('si_followups',[])}
+function saveFollowups(arr){saveLS('si_followups',arr)}
+
+function addFollowup(){
+  const customer=document.getElementById('fu-customer').value.trim();const date=document.getElementById('fu-date').value;
+  if(!customer||!date){alert('Nama customer dan tanggal wajib diisi!');return}
+  const fu=getFollowups();
+  fu.unshift({id:Date.now(),customer,date,time:document.getElementById('fu-time').value,div:document.getElementById('fu-div').value,channel:document.getElementById('fu-channel').value.trim(),notes:document.getElementById('fu-notes').value.trim(),status:'pending',created:new Date().toISOString()});
+  saveFollowups(fu);
+  apiPost({action:'addFollowup',data:fu[0]}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  ['fu-customer','fu-date','fu-time','fu-channel','fu-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fu-date').value=todayStr();renderFollowups();
+}
+
+function toggleFollowupStatus(id){
+  const fu=getFollowups();const item=fu.find(f=>f.id===id);
+  if(item){item.status=item.status==='pending'?'done':'pending';saveFollowups(fu);
+    apiPost({action:'updateFollowup',id,status:item.status}).then(ok=>showSyncBadge(ok?'ok':'err'));}
+  renderFollowups();
+}
+function deleteFollowup(id){
+  saveFollowups(getFollowups().filter(f=>f.id!==id));
+  apiPost({action:'deleteFollowup',id}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  renderFollowups();
+}
+
+function renderFollowups(){
+  const filter=document.getElementById('fu-filter').value;
+  const isMgrOrAbove=(currentRole==='master'||currentRole==='manager');
+  const isStaff=(currentRole==='staff');
+  const myDiv=DIV_FOR_ROLE[currentUser]||null;
+
+  let allItems=getFollowups();
+  /* Staff hanya lihat follow-up divisi mereka sendiri */
+  if(isStaff && myDiv) allItems=allItems.filter(f=>f.div===myDiv);
+
+  let items=[...allItems];
+  if(filter!=='all')items=items.filter(f=>f.status===filter);
+  items.sort((a,b)=>{if(a.status!==b.status)return a.status==='pending'?-1:1;return(a.date+a.time).localeCompare(b.date+b.time)});
+
+  document.getElementById('fu-total-v').textContent=allItems.length;
+  document.getElementById('fu-pending-v').textContent=allItems.filter(f=>f.status==='pending').length;
+  document.getElementById('fu-done-v').textContent=allItems.filter(f=>f.status==='done').length;
+
+  const wrap=document.getElementById('fu-list');
+  if(!items.length){wrap.innerHTML='<div class="empty-state">Tidak ada follow-up'+(filter!=='all'?' dengan filter ini':'')+'. Tambahkan di form atas ↑</div>';return}
+  const div2=DIV_MAP;
+  wrap.innerHTML=items.map(f=>{
+    const div=div2[f.div]||DIVISIONS[0];
+    const dateStr=f.date?new Date(f.date+'T00:00:00').toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short',year:'numeric'}):'';
+    const isDone=f.status==='done';
+    /* Tombol hapus hanya untuk master/manager */
+    const delBtn=isMgrOrAbove?`<button class="fu-del-btn" onclick="deleteFollowup(${f.id})">✕</button>`:'';
+    return`<div class="fu-item${isDone?' done-fu':''}"><div class="fu-item-top"><div class="fu-customer">👤 ${escH(f.customer)}</div><div class="fu-actions"><button class="fu-status-btn ${f.status}" onclick="toggleFollowupStatus(${f.id})">${isDone?'✅ Selesai':'⏳ Pending'}</button>${delBtn}</div></div><div class="fu-meta">${dateStr?`<span>📅 ${dateStr}</span>`:''}${f.time?`<span>🕐 ${f.time}</span>`:''}${f.channel?`<span>📱 ${escH(f.channel)}</span>`:''}</div>${f.notes?`<div class="fu-notes">"${escH(f.notes)}"</div>`:''}<div><span class="fu-div-badge" style="background:${div.color}22;color:${div.color}">${div.icon} ${div.label}</span></div></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   PLAN PROMO
+═══════════════════════════════════════════════ */
+function getPromos(){return loadLS('si_promos',[])}
+function savePromos(arr){saveLS('si_promos',arr)}
+
+function addPromo(){
+  const text=document.getElementById('promo-text').value.trim();
+  const start=document.getElementById('promo-start').value;
+  const deadline=document.getElementById('promo-deadline').value;
+  const div=document.getElementById('promo-div').value;
+  if(!text){alert('Nama promo tidak boleh kosong');return}
+  if(!start||!deadline){alert('Tanggal mulai dan deadline harus diisi');return}
+  if(deadline<start){alert('Deadline tidak boleh sebelum tanggal mulai');return}
+  const promos=getPromos();
+  promos.unshift({id:Date.now(),text,start,deadline,div,done:false,created:todayStr()});
+  savePromos(promos);
+  document.getElementById('promo-text').value='';
+  document.getElementById('promo-start').value='';
+  document.getElementById('promo-deadline').value='';
+  renderPromos();
+}
+
+function togglePromoDone(id){
+  const promos=getPromos();
+  const p=promos.find(x=>x.id===id);
+  if(p){p.done=!p.done;savePromos(promos);renderPromos();}
+}
+
+function deletePromo(id){
+  if(!confirm('Hapus promo ini?'))return;
+  savePromos(getPromos().filter(x=>x.id!==id));
+  renderPromos();
+}
+
+/* Sub-task di dalam promo */
+function addPromoTask(promoId){
+  const inp=document.getElementById(`pst-${promoId}`);
+  if(!inp) return;
+  const text=inp.value.trim();
+  if(!text) return;
+  const tasks=loadLS(`si_promo_tasks_${promoId}`,[]);
+  tasks.push({id:Date.now(),text});
+  saveLS(`si_promo_tasks_${promoId}`,tasks);
+  inp.value='';
+  renderPromos();
+}
+
+function togglePromoTask(promoId,taskId,checked){
+  const key=`si_promo_done_${currentUser||'guest'}_${promoId}`;
+  const done=loadLS(key,{});
+  if(checked) done[taskId]=true; else delete done[taskId];
+  saveLS(key,done);
+  renderPromos();
+}
+
+function deletePromoTask(promoId,taskId){
+  const tasks=loadLS(`si_promo_tasks_${promoId}`,[]).filter(t=>t.id!==taskId);
+  saveLS(`si_promo_tasks_${promoId}`,tasks);
+  renderPromos();
+}
+
+/* Hitung penalty skor promo: -10 per hari melewati deadline (max -100) */
+function calcPromoPenalty(promos){
+  const today=todayStr();
+  let totalPenalty=0;
+  const overdueList=[];
+  promos.forEach(p=>{
+    if(p.done) return; /* sudah selesai, tidak kena penalti */
+    if(p.deadline && today > p.deadline){
+      const deadDate=new Date(p.deadline+'T00:00:00');
+      const todayDate=new Date(today+'T00:00:00');
+      const daysOver=Math.round((todayDate-deadDate)/(1000*60*60*24));
+      const penalty=Math.min(daysOver*10,100);
+      totalPenalty+=penalty;
+      overdueList.push({text:p.text,daysOver,penalty,div:p.div});
+    }
+  });
+  return{totalPenalty,overdueList};
+}
+
+function renderPromos(){
+  const wrap=document.getElementById('promo-list-wrap');
+  if(!wrap) return;
+  const isMgrOrAbove=(currentRole==='master'||currentRole==='manager');
+  const isStaff=(currentRole==='staff');
+  const myDiv=DIV_FOR_ROLE[currentUser]||null;
+
+  /* Staff hanya lihat promo divisi mereka */
+  let promos=getPromos();
+  if(isStaff && myDiv) promos=promos.filter(p=>p.div===myDiv);
+
+  const today=todayStr();
+  const DIV_MAP2={tiktok:{icon:'🎵',label:'TikTok & Tokopedia',color:'#e91e8c'},shopee:{icon:'🛒',label:'Shopee & Bli2',color:'#ff6a00'},offline:{icon:'🏢',label:'Offline & Admin',color:'#5c6bc0'}};
+
+  if(!promos.length){
+    wrap.innerHTML=`<div class="empty-state">${isStaff?'Belum ada promo untuk divisi Anda.':'Belum ada promo. Tambahkan di form atas ↑'}</div>`;
+    return;
+  }
+
+  let html='';
+  const {totalPenalty,overdueList}=calcPromoPenalty(promos);
+
+  /* Summary penalty */
+  if(overdueList.length>0){
+    html+=`<div style="background:#fdecea;border:1.5px solid #ffcdd2;border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;color:#c62828;margin-bottom:6px">⚠️ ${overdueList.length} promo melewati deadline — Total penalti skor: -${Math.min(totalPenalty,100)}</div>
+      ${overdueList.map(o=>`<div style="font-size:11.5px;color:#c62828;padding:2px 0">• ${escH(o.text)}: <b>${o.daysOver} hari terlambat</b> (-${o.penalty} poin)</div>`).join('')}
+    </div>`;
+  }
+
+  /* Aktif dulu, lalu selesai */
+  const active=promos.filter(p=>!p.done);
+  const done=promos.filter(p=>p.done);
+
+  function promoCard(p){
+    const d=DIV_MAP2[p.div]||DIV_MAP2.tiktok;
+    const isOverdue=!p.done && today > p.deadline;
+    const isDone=p.done;
+    const canManage=isMgrOrAbove; /* hanya manager/master bisa kelola promo */
+
+    let daysInfo='';
+    if(!isDone && p.deadline){
+      if(isOverdue){
+        const daysOver=Math.round((new Date(today+'T00:00:00')-new Date(p.deadline+'T00:00:00'))/(1000*60*60*24));
+        const pen=Math.min(daysOver*10,100);
+        daysInfo=`<span class="promo-penalty">🔴 Terlambat ${daysOver} hari · Penalti -${pen} poin</span>`;
+      } else {
+        const daysLeft=Math.round((new Date(p.deadline+'T00:00:00')-new Date(today+'T00:00:00'))/(1000*60*60*24));
+        daysInfo=`<span class="promo-ontrack">${daysLeft===0?'⏰ Deadline hari ini!':daysLeft>0?`✅ Sisa ${daysLeft} hari`:'–'}</span>`;
+      }
+    }
+
+    /* Sub-checklist task milik promo ini (per-user done) */
+    const subTasks=loadLS(`si_promo_tasks_${p.id}`,[]);
+    const userDonePromo=loadLS(`si_promo_done_${currentUser||'guest'}_${p.id}`,{});
+    const subDone=subTasks.filter(t=>!!userDonePromo[t.id]).length;
+    const subPct=subTasks.length?Math.round(subDone/subTasks.length*100):0;
+
+    const subTasksHTML=subTasks.length?subTasks.map((t,i)=>{
+      const checked=!!userDonePromo[t.id];
+      return`<div class="task-item" style="padding:5px 0">
+        <input type="checkbox" class="task-cb" ${checked?'checked':''} onchange="togglePromoTask(${p.id},${t.id},this.checked)">
+        <span class="task-text${checked?' done':''}" style="font-size:12.5px">${escH(t.text)}</span>
+        ${canManage?`<button class="task-del" onclick="deletePromoTask(${p.id},${t.id})">✕</button>`:''}
+      </div>`;
+    }).join(''):'<div style="font-size:11.5px;color:#ccc;padding:4px 0;font-style:italic">Belum ada sub-task. Manager akan menambahkan.</div>';
+
+    /* Hanya manager/master yang bisa tambah sub-task */
+    const addSubHTML=canManage
+      ?`<div class="add-row" style="margin-top:8px"><input class="add-input" id="pst-${p.id}" placeholder="Tambah sub-task promo..." style="font-size:12px" onkeydown="if(event.key==='Enter')addPromoTask(${p.id})"><button class="add-btn" style="font-size:11px;padding:6px 10px" onclick="addPromoTask(${p.id})">+ Tambah</button></div>`:'';
+
+    const progBar=subTasks.length?`<div style="margin:6px 0 4px"><div style="display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:3px"><span>${subPct}% selesai</span><span>${subDone}/${subTasks.length} sub-task</span></div><div class="prog-bar"><div class="prog-fill" style="width:${subPct}%;background:${d.color}"></div></div></div>`:'';
+
+    return`<div class="promo-item${isDone?' promo-done':isOverdue?' promo-overdue':''}" id="promo-card-${p.id}">
+      <div class="promo-header">
+        <div class="promo-name">${escH(p.text)}</div>
+        <div class="promo-actions">
+          ${canManage?`<button class="promo-done-btn ${isDone?'done':'pending'}" onclick="togglePromoDone(${p.id})">${isDone?'✅ Selesai':'⏳ Aktif'}</button>`:`<span class="badge-pill ${isDone?'grade-a':'grade-b'}" style="font-size:10px;padding:3px 8px">${isDone?'✅ Selesai':'⏳ Aktif'}</span>`}
+          ${currentRole==='master'?`<button class="promo-del-btn" onclick="deletePromo(${p.id})">✕</button>`:''}
+        </div>
+      </div>
+      <div class="promo-meta">
+        <span>📅 Mulai: <b>${p.start}</b></span>
+        <span>⏰ Deadline: <b>${p.deadline}</b></span>
+        <span><span style="background:${d.color}22;color:${d.color};border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700">${d.icon} ${d.label}</span></span>
+      </div>
+      ${daysInfo}
+      <div style="margin-top:10px;border-top:1px solid #f0f0f6;padding-top:8px">
+        <div style="font-size:10.5px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">📋 Sub-task Promo</div>
+        ${progBar}
+        <div id="pst-list-${p.id}">${subTasksHTML}</div>
+        ${addSubHTML}
+      </div>
+    </div>`;
+  }
+
+  if(active.length){
+    html+=`<div class="promo-section-title">📣 Promo Aktif (${active.length})</div>`;
+    html+=active.map(promoCard).join('');
+  }
+  if(done.length){
+    html+=`<div class="promo-section-title" style="margin-top:16px">✅ Selesai (${done.length})</div>`;
+    html+=done.map(promoCard).join('');
+  }
+
+  wrap.innerHTML=html;
+}
+
+/* ═══════════════════════════════════════════════
+   SKOR KINERJA TO-DO LIST
+═══════════════════════════════════════════════ */
+function getSkorHistory(){
+  const hist=loadLS('si_skor_hist',{});
+  /* Deduplikasi: kalau ada tanggal sama di divisi yang sama, ambil yang pertama saja */
+  Object.keys(hist).forEach(divKey=>{
+    const seen=new Set();
+    hist[divKey]=hist[divKey].filter(h=>{
+      if(seen.has(h.date))return false;
+      seen.add(h.date);return true;
+    });
+  });
+  return hist;
+}
+function saveSkorHistory(obj){saveLS('si_skor_hist',obj)}
+
+/* Hitung skor divisi untuk hari tertentu */
+function calcDivSkor(divKey, dateStr){
+  const tasks=loadLS(`si_tasks_today_${divKey}_${dateStr}`,[]);
+  if(!tasks.length) return null; /* tidak ada data */
+  const done=tasks.filter(t=>t.done).length;
+  return Math.round(done/tasks.length*100);
+}
+
+/* Auto-reset: saat buka dashboard di hari baru, arsip skor kemarin lalu reset */
+function checkDailyReset(){
+  const lastDate=loadLS('si_last_open_date','');
+  const today=todayStr();
+
+  /* Sudah diproses hari ini → tidak perlu reset lagi */
+  if(lastDate===today) return false;
+
+  /* Ada task lama yang perlu diarsip */
+  const hasOldTasks=DIVISIONS.some(div=>getTasks('today',div.key).length>0);
+
+  if(hasOldTasks){
+    const archiveDate=lastDate||today;
+    const hist=getSkorHistory();
+    DIVISIONS.forEach(div=>{
+      const tasks=getTasks('today',div.key);
+      if(tasks.length){
+        const done=tasks.filter(t=>t.done).length;
+        const skor=Math.round(done/tasks.length*100);
+        if(!hist[div.key]) hist[div.key]=[];
+        /* Cegah duplikat: jangan arsip kalau tanggal sama sudah ada */
+        const alreadyArchived=hist[div.key].some(h=>h.date===archiveDate);
+        if(!alreadyArchived){
+          hist[div.key].unshift({date:archiveDate,skor,total:tasks.length,done});
+          if(hist[div.key].length>60) hist[div.key]=hist[div.key].slice(0,60);
+          saveLS(`si_tasks_today_${div.key}_${archiveDate}`, tasks);
+        }
+      }
+      saveTasks('today', div.key, []);
+    });
+    saveSkorHistory(hist);
+  }
+
+  /* Tandai sudah diproses hari ini — tidak akan reset lagi sampai besok */
+  saveLS('si_last_open_date', today);
+  /* Simpan flag agar syncFromSheets tidak menimpa task kosong hari ini */
+  saveLS('si_reset_date', today);
+  return hasOldTasks;
+}
+
+function getGrade(skor){
+  if(skor>=95) return {label:'S — Sempurna',cls:'grade-s'};
+  if(skor>=80) return {label:'A — Sangat Baik',cls:'grade-a'};
+  if(skor>=65) return {label:'B — Baik',cls:'grade-b'};
+  if(skor>=50) return {label:'C — Cukup',cls:'grade-c'};
+  return {label:'D — Perlu Ditingkatkan',cls:'grade-d'};
+}
+
+function skorColor(s){return s>=95?'#2e7d32':s>=80?'#1565c0':s>=65?'#f57f17':s>=50?'#bf360c':'#880e4f'}
+
+function renderSkor(){
+  const hist=getSkorHistory();
+  const today=todayStr();
+  const wrap=document.getElementById('skor-content');
+  if(!wrap) return;
+
+  /* ── Skor To-Do hari ini (pakai done per-user) ── */
+  const todaySkor={};
+  DIVISIONS.forEach(div=>{
+    const tasks=getTasksWithUserDone('today',div.key);
+    if(tasks.length){
+      const done=tasks.filter(t=>t.done).length;
+      todaySkor[div.key]={skor:Math.round(done/tasks.length*100),done,total:tasks.length};
+    } else {
+      todaySkor[div.key]=null;
+    }
+  });
+
+  /* ── Skor Plan Promo per divisi ── */
+  const allPromos=getPromos();
+  const promoSkorByDiv={};  /* {skor, total, done, overdueList, penalty} */
+  DIVISIONS.forEach(div=>{
+    const divPromos=allPromos.filter(p=>p.div===div.key);
+    const total=divPromos.length;
+    const done=divPromos.filter(p=>p.done).length;
+
+    /* Hitung penalti dari promo aktif yang melewati deadline */
+    let penalty=0;
+    const overdueList=[];
+    divPromos.filter(p=>!p.done && p.deadline && today > p.deadline).forEach(p=>{
+      const daysOver=Math.round((new Date(today+'T00:00:00')-new Date(p.deadline+'T00:00:00'))/(1000*60*60*24));
+      const pen=Math.min(daysOver*10,100);
+      penalty+=pen;
+      overdueList.push({text:p.text,daysOver,penalty:pen,deadline:p.deadline});
+    });
+
+    /* Skor promo = (done/total)*100 dikurangi penalti, min 0 */
+    const baseSkorPromo=total>0?Math.round(done/total*100):null;
+    const skorPromo=baseSkorPromo!==null?Math.max(0,baseSkorPromo-penalty):null;
+    promoSkorByDiv[div.key]={skor:skorPromo,baseSkor:baseSkorPromo,total,done,penalty:Math.min(penalty,100),overdueList};
+  });
+
+  let html=`<div class="skor-header">
+    <div style="font-size:13px;font-weight:700;color:#1a1a2e">🏆 Skor Kinerja per Divisi</div>
+    <div style="font-size:11px;color:#aaa">To-Do Harian + Plan Promo · Terlambat deadline = −10 poin/hari</div>
+  </div>`;
+
+  /* ── Kartu per divisi ── */
+  html+=`<div class="skor-grid">`;
+  DIVISIONS.forEach(div=>{
+    const ts=todaySkor[div.key];
+    const ps=promoSkorByDiv[div.key];
+    const divHist=(hist[div.key]||[]).slice(0,7);
+    const avg7=divHist.length?Math.round(divHist.reduce((s,h)=>s+h.skor,0)/divHist.length):null;
+    const h30=(hist[div.key]||[]).slice(0,30);
+    const avg30=h30.length?Math.round(h30.reduce((s,h)=>s+h.skor,0)/h30.length):null;
+
+    /* Skor To-Do */
+    const todoSkorVal=ts?ts.skor:(divHist[0]?.skor??null);
+
+    /* Skor Final = rata-rata Todo + Promo (kalau keduanya ada), atau salah satu kalau hanya ada 1 */
+    let finalSkor=null;
+    if(todoSkorVal!==null && ps.skor!==null) finalSkor=Math.round((todoSkorVal+ps.skor)/2);
+    else if(todoSkorVal!==null) finalSkor=todoSkorVal;
+    else if(ps.skor!==null) finalSkor=ps.skor;
+
+    const grade=finalSkor!==null?getGrade(finalSkor):null;
+    const color=div.color;
+
+    html+=`<div class="skor-card">
+      <div class="skor-div-header">
+        <div class="skor-div-icon" style="background:${color}22">${div.icon}</div>
+        <div><div class="skor-div-name">${div.label}</div>
+        <div class="skor-div-sub">${ts?`To-Do: ${ts.done}/${ts.total} selesai`:(divHist[0]?`Kemarin: ${divHist[0].done}/${divHist[0].total}`:'Belum ada data')}</div></div>
+      </div>
+
+      <!-- SKOR FINAL BESAR -->
+      <div class="skor-big" style="color:${finalSkor!==null?skorColor(finalSkor):'#ccc'}">${finalSkor!==null?finalSkor:'–'}</div>
+      ${grade?`<span class="skor-grade ${grade.cls}">${grade.label}</span>`:'<span style="font-size:11px;color:#ccc;display:block;text-align:center;margin-bottom:12px">Belum ada data</span>'}
+
+      <!-- DUA BARIS SKOR BREAKDOWN -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 10px">
+        <!-- To-Do -->
+        <div style="background:#f0f4ff;border-radius:10px;padding:10px;text-align:center">
+          <div style="font-size:9.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">✅ To-Do Harian</div>
+          <div style="font-size:26px;font-weight:800;color:${todoSkorVal!==null?skorColor(todoSkorVal):'#ccc'}">${todoSkorVal!==null?todoSkorVal:'–'}</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px">${ts?`${ts.done}/${ts.total} task`:(divHist[0]?`Kemarin: ${divHist[0].skor}`:'Belum ada')}</div>
+        </div>
+        <!-- Plan Promo -->
+        <div style="background:#fff8f0;border-radius:10px;padding:10px;text-align:center;position:relative">
+          <div style="font-size:9.5px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">📣 Plan Promo</div>
+          <div style="font-size:26px;font-weight:800;color:${ps.skor!==null?skorColor(ps.skor):'#ccc'}">${ps.skor!==null?ps.skor:'–'}</div>
+          <div style="font-size:10px;color:#aaa;margin-top:2px">${ps.total>0?`${ps.done}/${ps.total} promo selesai`:'Belum ada promo'}</div>
+          ${ps.penalty>0?`<div style="font-size:9.5px;color:#c62828;font-weight:700;margin-top:3px">−${ps.penalty} (${ps.overdueList.length} terlambat)</div>`:''}
+        </div>
+      </div>
+
+      <!-- PROMO OVERDUE LIST -->
+      ${ps.overdueList.length?`<div style="background:#fdecea;border-radius:8px;padding:8px 10px;margin-bottom:10px">
+        <div style="font-size:9.5px;font-weight:700;color:#c62828;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">⚠️ Promo Melebihi Deadline</div>
+        ${ps.overdueList.map(p=>`<div style="display:flex;justify-content:space-between;font-size:11px;color:#c62828;padding:2px 0">
+          <span>${escH(p.text)} <span style="color:#aaa">(${p.deadline})</span></span>
+          <span style="font-weight:700;white-space:nowrap;margin-left:8px">${p.daysOver}h → −${p.penalty}poin</span>
+        </div>`).join('')}
+      </div>`:''}
+
+      <!-- RATA-RATA -->
+      <div class="skor-avg-strip">
+        <div class="skor-avg-box"><div class="skor-avg-val" style="color:${avg7!==null?skorColor(avg7):'#ccc'}">${avg7!==null?avg7:'–'}</div><div class="skor-avg-lbl">Rata-rata 7 Hari</div></div>
+        <div class="skor-avg-box"><div class="skor-avg-val" style="color:${avg30!==null?skorColor(avg30):'#ccc'}">${avg30!==null?avg30:'–'}</div><div class="skor-avg-lbl">Rata-rata 30 Hari</div></div>
+        <div class="skor-avg-box"><div class="skor-avg-val">${divHist.length}</div><div class="skor-avg-lbl">Hari Tercatat</div></div>
+      </div>
+
+      <!-- RIWAYAT 7 HARI -->
+      ${divHist.length?`<div class="skor-hist"><div class="skor-hist-title">📅 Riwayat 7 Hari Terakhir</div>`+divHist.map(h=>{const g=getGrade(h.skor);return`<div class="skor-hist-row"><span class="skor-hist-date">${h.date}</span><div style="display:flex;align-items:center;gap:8px"><span class="badge-pill ${g.cls}" style="font-size:9px;padding:1px 6px">${h.skor}</span><span style="font-size:10px;color:#aaa">${h.done}/${h.total}</span></div></div>`}).join('')+'</div>':''}
+    </div>`;
+  });
+  html+=`</div>`;
+
+  /* ── Ringkasan total tim ── */
+  const finalSkors=DIVISIONS.map(d=>{
+    const ts=todaySkor[d.key];
+    const ps=promoSkorByDiv[d.key];
+    const todoV=ts?ts.skor:null;
+    const promoV=ps.skor;
+    if(todoV!==null && promoV!==null) return Math.round((todoV+promoV)/2);
+    if(todoV!==null) return todoV;
+    if(promoV!==null) return promoV;
+    return null;
+  }).filter(x=>x!==null);
+
+  if(finalSkors.length){
+    const avgToday=Math.round(finalSkors.reduce((s,x)=>s+x,0)/finalSkors.length);
+    const gradeTeam=getGrade(avgToday);
+    const totalOverdue=DIVISIONS.reduce((s,d)=>s+promoSkorByDiv[d.key].overdueList.length,0);
+    html+=`<div class="card" style="background:linear-gradient(135deg,#1a1a2e,#0f3460);color:white;border:none">
+      <div style="text-align:center;padding:8px 0">
+        <div style="font-size:11px;font-weight:700;opacity:.7;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Skor Tim Hari Ini</div>
+        <div style="font-size:56px;font-weight:800;line-height:1">${avgToday}</div>
+        <div style="margin-top:8px;font-size:14px;font-weight:700;padding:4px 16px;border-radius:20px;display:inline-block;background:rgba(255,255,255,.15)">${gradeTeam.label}</div>
+        ${totalOverdue>0?`<div style="margin-top:8px;font-size:11px;background:rgba(198,40,40,.35);border-radius:8px;padding:4px 14px;display:inline-block">⚠️ ${totalOverdue} promo melebihi deadline</div>`:'<div style="margin-top:8px;font-size:11px;opacity:.5">Semua promo on track ✅</div>'}
+        <div style="margin-top:10px;font-size:11px;opacity:.6">${finalSkors.length} dari ${DIVISIONS.length} divisi aktif hari ini</div>
+      </div>
+    </div>`;
+  }
+
+  wrap.innerHTML=html;
+}
+
+/* ═══════════════════════════════════════════════
+   ACTIVITY LOG (catat setiap input transaksi)
+═══════════════════════════════════════════════ */
+function getActivityLog(){return loadLS('si_activity_log',[])}
+function addActivityLog(entry){
+  const log=getActivityLog();
+  log.unshift({...entry, ts: new Date().toISOString(), by: currentUser||'unknown'});
+  if(log.length>500) log.splice(500); /* simpan max 500 entri */
+  saveLS('si_activity_log', log);
+}
+
+/* ═══════════════════════════════════════════════
+   HISTORY MODAL
+═══════════════════════════════════════════════ */
+let histTab='tabel';
+
+function openHistoryModal(){
+  /* Populate sales dropdown */
+  const sSel=document.getElementById('hist-sales');
+  sSel.innerHTML='<option value="">Semua Sales</option>';
+  SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;sSel.appendChild(o)});
+  /* Default range: bulan ini */
+  const now=new Date();
+  const firstDay=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('hist-from').value=firstDay;
+  document.getElementById('hist-to').value=todayStr();
+  histTab='tabel';
+  switchHistTab('tabel');
+  renderHistory();
+}
+
+function switchHistTab(tab){
+  histTab=tab;
+  document.getElementById('hist-tabel-wrap').style.display=tab==='tabel'?'':'none';
+  document.getElementById('hist-log-wrap').style.display=tab==='log'?'':'none';
+  document.getElementById('htab-tabel').style.background=tab==='tabel'?'#0f3460':'white';
+  document.getElementById('htab-tabel').style.color=tab==='tabel'?'white':'#888';
+  document.getElementById('htab-tabel').style.borderColor=tab==='tabel'?'#0f3460':'#e0e0ea';
+  document.getElementById('htab-log').style.background=tab==='log'?'#0f3460':'white';
+  document.getElementById('htab-log').style.color=tab==='log'?'white':'#888';
+  document.getElementById('htab-log').style.borderColor=tab==='log'?'#0f3460':'#e0e0ea';
+  renderHistory();
+}
+
+function getHistFilters(){
+  return{
+    from: document.getElementById('hist-from').value,
+    to:   document.getElementById('hist-to').value,
+    sales: document.getElementById('hist-sales').value,
+    platform: document.getElementById('hist-platform').value
+  };
+}
+
+function resetHistFilter(){
+  const now=new Date();
+  document.getElementById('hist-from').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('hist-to').value=todayStr();
+  document.getElementById('hist-sales').value='';
+  document.getElementById('hist-platform').value='';
+  renderHistory();
+}
+
+function renderHistory(){
+  const f=getHistFilters();
+  const allTxns=getTxns();
+
+  /* Filter transaksi */
+  const txns=allTxns.filter(t=>{
+    if(f.from && t.date < f.from) return false;
+    if(f.to   && t.date > f.to)   return false;
+    if(f.sales && t.salesName !== f.sales) return false;
+    if(f.platform && t.platform !== f.platform) return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
+
+  /* Ringkasan strip */
+  const totalAmt=txns.reduce((s,t)=>s+t.amount,0);
+  const totalQty=txns.reduce((s,t)=>s+t.qty,0);
+  const uniqueCust=new Set(txns.map(t=>t.customerName)).size;
+  const uniqueDays=new Set(txns.map(t=>t.date)).size;
+  document.getElementById('hist-summary-strip').innerHTML=`
+    <div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:#0f3460">${txns.length}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">Transaksi</div>
+    </div>
+    <div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:16px;font-weight:800;color:#0f3460">${idr(totalAmt)}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">Total Revenue</div>
+    </div>
+    <div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:#0f3460">${uniqueCust}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">Customer Unik</div>
+    </div>
+    <div style="background:#f4f6fb;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:18px;font-weight:800;color:#0f3460">${uniqueDays}</div>
+      <div style="font-size:10px;color:#aaa;margin-top:2px">Hari Aktif</div>
+    </div>`;
+
+  if(histTab==='tabel') renderHistTabel(txns);
+  else renderHistLog(f);
+}
+
+function parseDateLabel(dateStr){
+  /* dateStr bisa format YYYY-MM-DD */
+  if(!dateStr||typeof dateStr!=='string')return'Tanggal tidak diketahui';
+  const parts=dateStr.split('-');
+  if(parts.length!==3)return dateStr;
+  const y=parseInt(parts[0]),m=parseInt(parts[1]),d=parseInt(parts[2]);
+  if(isNaN(y)||isNaN(m)||isNaN(d))return dateStr;
+  const dayOfWeek=new Date(y,m-1,d).getDay();
+  return`${DAYS[dayOfWeek]}, ${d} ${MONTHS_ID[m-1]} ${y}`;
+}
+
+function renderHistTabel(txns){
+  const wrap=document.getElementById('hist-tabel-wrap');
+  if(!txns.length){wrap.innerHTML='<div class="empty-state">Tidak ada transaksi untuk filter ini.</div>';return}
+
+  /* Group by date */
+  const byDate={};
+  txns.forEach(t=>{
+    const key=t.date||'unknown';
+    if(!byDate[key])byDate[key]=[];
+    byDate[key].push(t);
+  });
+
+  const platColors={tokopedia:'#42a5f5',shopee:'#ff7043',tiktok:'#222',bli2:'#66bb6a',offline:'#888'};
+
+  let html='';
+  Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([date,rows])=>{
+    const dayTotal=rows.reduce((s,t)=>s+t.amount,0);
+    const dayLabel=parseDateLabel(date);
+    html+=`<div style="background:#e8f0fb;padding:7px 12px;font-size:11px;font-weight:700;color:#0f3460;border-radius:6px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+      <span>📅 ${dayLabel}</span><span style="font-size:10.5px;opacity:.8">${rows.length} transaksi · ${idr(dayTotal)}</span>
+    </div>`;
+    html+=`<table class="data-table" style="font-size:11px;margin-bottom:14px"><thead><tr>
+      <th>#</th><th>Waktu Input</th><th>Diinput oleh</th><th>Sales</th><th>Customer</th><th>Produk</th><th>Qty</th><th>Amount</th><th>Platform</th><th>Aksi</th>
+    </tr></thead><tbody>`;
+    rows.forEach((t,i)=>{
+      const pc=platColors[t.platform]||'#aaa';
+      /* Waktu & user input */
+      let inputTime='–';let inputBy='–';
+      if(t.inputAt){
+        const d=new Date(t.inputAt);
+        inputTime=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      }
+      if(t.inputBy){
+        inputBy=ROLE_LABELS[t.inputBy]||t.inputBy;
+      }
+      html+=`<tr>
+        <td>${i+1}</td>
+        <td style="white-space:nowrap;font-size:10.5px;color:#888">${inputTime}</td>
+        <td style="font-size:10px;color:#555;white-space:nowrap">${escH(inputBy)}</td>
+        <td style="font-size:10.5px">${escH(t.salesName||'')}</td>
+        <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.customerName||'')}</td>
+        <td style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px">${escH(t.productName||'')}</td>
+        <td>${t.qty}</td>
+        <td style="font-weight:700;white-space:nowrap">${idr(t.amount)}</td>
+        <td><span style="background:${pc}22;color:${pc};font-size:9px;font-weight:700;border-radius:4px;padding:2px 5px">${t.platform||'–'}</span></td>
+        <td><div class="txn-row-actions">
+          <button class="act-btn act-btn-edit" onclick="openEditTxn(${t.id});closeModal('modal-history')">✏️</button>
+          <button class="act-btn act-btn-del" onclick="deleteTxnFromHistory(${t.id})">🗑</button>
+        </div></td>
+      </tr>`;
+    });
+    html+='</tbody></table>';
+  });
+  wrap.innerHTML=html;
+}
+
+function deleteTxnFromHistory(id){
+  if(!confirm('Hapus transaksi ini?'))return;
+  saveLS('si_txns',getTxns().filter(t=>t.id!==id));
+  pushAllTxnsToSheets(); /* bulk replace — lebih aman dari deleteTxn individual */
+  addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi ID ${id}`});
+  initFilters();refreshSales();
+  renderHistory();
+}
+
+function renderHistLog(f){
+  const wrap=document.getElementById('hist-log-wrap');
+  const log=getActivityLog();
+
+  /* Filter log by date range */
+  const filtered=log.filter(l=>{
+    const d=l.ts?l.ts.split('T')[0]:'';
+    if(f.from && d < f.from) return false;
+    if(f.to   && d > f.to)   return false;
+    return true;
+  });
+
+  if(!filtered.length){wrap.innerHTML='<div class="empty-state">Belum ada log aktivitas untuk periode ini.<br><span style="font-size:11px;color:#bbb">Log dicatat mulai dari transaksi yang diinput setelah fitur ini aktif.</span></div>';return}
+
+  const platIcons={tokopedia:'🔵',shopee:'🟠',tiktok:'⚫',bli2:'🟢',offline:'🏢'};
+  wrap.innerHTML=filtered.map(l=>{
+    const ts=l.ts?new Date(l.ts):'';
+    const timeStr=ts?`${String(ts.getHours()).padStart(2,'0')}:${String(ts.getMinutes()).padStart(2,'0')}`:'';
+    const dateStr=ts?`${ts.getDate()} ${MONTHS_ID[ts.getMonth()]} ${ts.getFullYear()}`:'';
+    const byLabel=ROLE_LABELS[l.by]||l.by||'–';
+    const actionIcon={add_txn:'➕',delete_txn:'🗑️',edit_txn:'✏️'}[l.action]||'📝';
+    let detail='';
+    if(l.action==='add_txn'&&l.data){
+      const t=l.data;
+      detail=`<span style="font-weight:600">${escH(t.customerName||'')}</span> · ${escH(t.productName||'')} · ${idr(t.amount)} · ${platIcons[t.platform]||''} ${t.platform||''}`;
+    } else if(l.desc){ detail=escH(l.desc); }
+    return`<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid #f5f5f9;align-items:flex-start">
+      <div style="font-size:18px;flex-shrink:0;margin-top:1px">${actionIcon}</div>
+      <div style="flex:1">
+        <div style="font-size:12px;color:#1a1a2e;line-height:1.5">${detail||'–'}</div>
+        <div style="font-size:10.5px;color:#aaa;margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
+          <span>👤 ${escH(byLabel)}</span>
+          <span>📅 ${dateStr} ${timeStr?'· 🕐 '+timeStr:''}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   EDIT & HAPUS TRANSAKSI (Master)
+═══════════════════════════════════════════════ */
+function renderTxnList(){
+  const search=(document.getElementById('txn-search')?.value||'').toLowerCase();
+  const txns=getTxns().filter(t=>{
+    if(!search) return true;
+    return t.customerName?.toLowerCase().includes(search)||t.salesName?.toLowerCase().includes(search)||t.productName?.toLowerCase().includes(search);
+  }).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,80);
+
+  const wrap=document.getElementById('txn-list-wrap');
+  if(!txns.length){wrap.innerHTML='<div class="empty-state">Tidak ada transaksi ditemukan.</div>';return}
+  wrap.innerHTML=`<table class="data-table" style="font-size:11.5px"><thead><tr><th>Tanggal</th><th>Sales</th><th>Customer</th><th>Produk</th><th>Qty</th><th>Amount</th><th>Aksi</th></tr></thead><tbody>`+
+    txns.map(t=>`<tr>
+      <td style="white-space:nowrap">${t.date}</td>
+      <td style="font-size:10.5px">${escH(t.salesName||'')}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.customerName||'')}</td>
+      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px">${escH(t.productName||'')}</td>
+      <td>${t.qty}</td>
+      <td style="white-space:nowrap;font-weight:700">${idr(t.amount)}</td>
+      <td><div class="txn-row-actions">
+        <button class="act-btn act-btn-edit" onclick="openEditTxn(${t.id})">✏️</button>
+        <button class="act-btn act-btn-del" onclick="deleteTxnById(${t.id})">🗑</button>
+      </div></td>
+    </tr>`).join('')+'</tbody></table>';
+}
+
+function openEditTxn(id){
+  const t=getTxns().find(x=>x.id===id);if(!t)return;
+  document.getElementById('edit-txn-id').value=id;
+  document.getElementById('edit-txn-date').value=t.date;
+  document.getElementById('edit-txn-customer').value=t.customerName;
+  document.getElementById('edit-txn-product').value=t.productName;
+  document.getElementById('edit-txn-qty').value=t.qty;
+  document.getElementById('edit-txn-amount').value=t.amount;
+  document.getElementById('edit-txn-platform').value=t.platform||'offline';
+  /* Populate sales dropdown */
+  const sel=document.getElementById('edit-txn-sales');
+  sel.innerHTML='<option value="">— Pilih Sales —</option>';
+  SALES_ACCOUNTS.forEach(s=>{const o=document.createElement('option');o.value=s.label;o.textContent=s.label;sel.appendChild(o)});
+  sel.value=t.salesName||'';
+  openModal('modal-edit-txn');
+}
+
+function saveEditTxn(){
+  const id=parseInt(document.getElementById('edit-txn-id').value);
+  const txns=getTxns();const idx=txns.findIndex(x=>x.id===id);if(idx<0)return;
+  txns[idx]={...txns[idx],
+    date:document.getElementById('edit-txn-date').value,
+    salesName:document.getElementById('edit-txn-sales').value,
+    customerName:document.getElementById('edit-txn-customer').value,
+    productName:document.getElementById('edit-txn-product').value,
+    qty:parseInt(document.getElementById('edit-txn-qty').value)||1,
+    amount:parseFloat(document.getElementById('edit-txn-amount').value)||0,
+    platform:document.getElementById('edit-txn-platform').value
+  };
+  saveLS('si_txns',txns);
+  /* Untuk Sheets: push semua (bulk replace lebih andal dari delete+add) */
+  pushAllTxnsToSheets();
+  addActivityLog({action:'edit_txn',txnId:id,desc:`Edit transaksi ${txns[idx].customerName} · ${idr(txns[idx].amount)}`});
+  showSyncBadge('ok');
+  const okEl=document.getElementById('edit-txn-ok');
+  okEl.style.display='block';
+  setTimeout(()=>{okEl.style.display='none';closeModal('modal-edit-txn');renderTxnList();initFilters();refreshSales();},1200);
+}
+
+function deleteTxnById(id){
+  if(!confirm('Hapus transaksi ini? Tindakan tidak bisa dibatalkan.'))return;
+  const t=getTxns().find(x=>x.id===id);
+  saveLS('si_txns',getTxns().filter(x=>x.id!==id));
+  pushAllTxnsToSheets();
+  addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi${t?` ${t.customerName} · ${idr(t.amount)}`:' ID '+id}`});
+  renderTxnList();initFilters();refreshSales();
+}
+
+/* ═══════════════════════════════════════════════
+   EDIT & HAPUS TARGET (Master)
+═══════════════════════════════════════════════ */
+function renderTargetManage(){
+  const tgts=getTargets();
+  const wrap=document.getElementById('target-list-manage');
+  const entries=Object.entries(tgts).sort((a,b)=>b[0].localeCompare(a[0]));
+  if(!entries.length){wrap.innerHTML='<div class="empty-state">Belum ada target.</div>';return}
+  wrap.innerHTML=entries.map(([k,v])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f9;gap:8px">
+    <div><div style="font-size:12px;font-weight:600;color:#1a1a2e">${k}</div><div style="font-size:11px;color:#888">${idr(v)}</div></div>
+    <div class="txn-row-actions">
+      <button class="act-btn act-btn-edit" onclick="openEditTarget('${escH(k)}',${v})">✏️ Edit</button>
+      <button class="act-btn act-btn-del" onclick="deleteTarget('${escH(k)}')">🗑 Hapus</button>
+    </div>
+  </div>`).join('');
+}
+
+function openEditTarget(key,val){
+  document.getElementById('edit-tgt-key').value=key;
+  document.getElementById('edit-tgt-key-display').value=key;
+  document.getElementById('edit-tgt-value').value=val;
+  openModal('modal-edit-target');
+}
+
+function saveEditTarget(){
+  const key=document.getElementById('edit-tgt-key').value;
+  const val=parseFloat(document.getElementById('edit-tgt-value').value)||0;
+  if(!val){alert('Masukkan nilai target yang valid');return}
+  const tgts=getTargets();
+  tgts[key]=val;
+  saveLS('si_targets',tgts);
+  apiPost({action:'setTarget',key,value:val}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  const okEl=document.getElementById('edit-tgt-ok');
+  okEl.style.display='block';
+  setTimeout(()=>{okEl.style.display='none';closeModal('modal-edit-target');renderTargetManage();renderTargetList();refreshSales();},1200);
+}
+
+function deleteTarget(key){
+  if(!confirm(`Hapus target "${key}"?`))return;
+  const tgts=getTargets();
+  delete tgts[key];
+  saveLS('si_targets',tgts);
+  apiPost({action:'deleteTarget',key}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  renderTargetManage();renderTargetList();refreshSales();
+}
+
+/* ═══════════════════════════════════════════════
+   EDIT TASK (Master & Manager)
+═══════════════════════════════════════════════ */
+function openEditTask(scope,divKey,idx){
+  const tasks=getTasks(scope,divKey);
+  if(!tasks[idx])return;
+  document.getElementById('edit-task-scope').value=scope;
+  document.getElementById('edit-task-divkey').value=divKey;
+  document.getElementById('edit-task-idx').value=idx;
+  document.getElementById('edit-task-text').value=tasks[idx].text;
+  openModal('modal-edit-task');
+}
+
+function saveEditTask(){
+  const scope=document.getElementById('edit-task-scope').value;
+  const divKey=document.getElementById('edit-task-divkey').value;
+  const idx=parseInt(document.getElementById('edit-task-idx').value);
+  const text=document.getElementById('edit-task-text').value.trim();
+  if(!text){alert('Teks task tidak boleh kosong');return}
+  const tasks=getTasks(scope,divKey);
+  if(!tasks[idx])return;
+  tasks[idx].text=text;
+  saveTasks(scope,divKey,tasks);
+  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets selalu sinkron */
+  pushAllTasksToSheets();
+  const okEl=document.getElementById('edit-task-ok');
+  okEl.style.display='block';
+  setTimeout(()=>{
+    okEl.style.display='none';
+    closeModal('modal-edit-task');
+    if(scope==='today') renderTasksSection(scope,'todo-divisions');
+    else if(scope==='week') renderTasksSection(scope,'week-divisions');
+  },900);
+}
+
+/* ═══════════════════════════════════════════════
+   CATATAN
+═══════════════════════════════════════════════ */
+function loadNotes(){
+  const saved=localStorage.getItem('shockit_notes');if(saved)document.getElementById('notesArea').value=saved;
+  const hist=loadLS('shockit_notes_hist',[]);
+  if(hist.length){document.getElementById('hist-card').style.display='';document.getElementById('hist-content').innerHTML=hist.slice(0,5).map(h=>`<div style="border-bottom:1px solid #f5f5f9;padding:9px 0"><div style="font-size:10.5px;color:#bbb;margin-bottom:3px">📅 ${h.date}</div><div style="font-size:12.5px;color:#555">${escH(h.text)}</div></div>`).join('')}
+}
+function saveNotes(){
+  const text=document.getElementById('notesArea').value.trim();if(!text)return;
+  localStorage.setItem('shockit_notes',text);
+  const hist=loadLS('shockit_notes_hist',[]);const d=new Date();
+  hist.unshift({date:`${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`,text:text.substring(0,200)});
+  saveLS('shockit_notes_hist',hist.slice(0,10));
+  const c=document.getElementById('saveConfirm');c.style.display='block';setTimeout(()=>{c.style.display='none';loadNotes()},2000);
+}
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+const sessionRestored = checkSession();
+/* Cek reset harian sebelum render task */
+const didReset = checkDailyReset();
+if(didReset){
+  /* Tampilkan notif reset */
+  setTimeout(()=>{
+    const n=document.createElement('div');
+    n.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border-radius:12px;padding:10px 20px;font-size:13px;font-weight:600;z-index:9998;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+    n.textContent='🌅 Hari baru! Skor kemarin telah diarsip & to-do list di-reset.';
+    document.body.appendChild(n);setTimeout(()=>n.remove(),4000);
+  },1000);
+}
+seedData();
+renderTasksSection('today','todo-divisions');
+renderFollowups();
+loadNotes();
+document.getElementById('fu-date').value=todayStr();
+if(sessionRestored){
+  applyRoleUI();
+  /* Sync awal saat halaman dibuka — jangan tunggu 20 detik */
+  setTimeout(syncFromSheets, 1500);
+}
+
+/* Auto-sync setiap 20 detik agar semua cabang selalu dapat data terbaru.
+   Safety: cek lock dan waktu mulai — kalau stuck > 30 detik akan auto-reset di dalam syncFromSheets. */
+setInterval(()=>{
+  if(currentUser && SHEETS_URL){
+    syncFromSheets();
+  }
+}, 20000);
+
+/* ── Midnight Reset: cek setiap menit apakah tanggal sudah berganti ──
+   Jika dashboard dibiarkan terbuka semalaman, ini yang memicu reset to-do saat jam 00:00.
+   Tanpa ini, reset hanya terjadi saat halaman di-refresh.
+
+   ALUR RESET:
+   1. checkDailyReset() → arsip skor kemarin, kosongkan today tasks di localStorage
+   2. pushAllTasksToSheets() → kirim today tasks KOSONG ke Sheets
+      (WAJIB: tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & undo reset!)
+   3. syncFromSheets() → tarik data terbaru (today tasks akan kosong/baru)
+   4. Re-render & notifikasi
+
+   Semua cabang yang masih buka akan ikut reset karena timer ini berjalan di setiap browser.
+   Cabang yang sedang tutup → reset saat dibuka keesokan harinya (existing behavior). */
+let _lastDateCheck = todayStr();
+setInterval(()=>{
+  const nowDate = todayStr();
+  if(nowDate !== _lastDateCheck){
+    _lastDateCheck = nowDate;
+    console.log('[MidnightReset] Tanggal berganti →', nowDate);
+
+    /* Step 1: arsip skor + kosongkan today tasks di localStorage */
+    checkDailyReset();
+
+    /* Step 2: push today tasks KOSONG ke Sheets agar cabang lain tidak balik ke task kemarin */
+    if(SHEETS_URL){
+      pushAllTasksToSheets().then(()=>{
+        /* Step 3: sync ulang dari Sheets (today tasks sudah kosong) */
+        if(currentUser && SHEETS_URL) syncFromSheets();
+      });
+    }
+
+    /* Step 4: re-render & notifikasi */
+    renderTasksSection('today','todo-divisions');
+    updateTodoSummary();
+    const n=document.createElement('div');
+    n.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border-radius:12px;padding:12px 22px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+    n.textContent='🌅 Tengah malam! Skor diarsip & to-do list baru siap untuk hari ini.';
+    document.body.appendChild(n);
+    setTimeout(()=>n.remove(), 6000);
+  }
+}, 60000); /* cek setiap 60 detik */
+</script>
+</body>
+</html>
