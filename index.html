@@ -996,10 +996,29 @@ let _syncStartTime  = 0;
    Bertahan selama session, tidak terpengaruh sync.
    PRIORITAS TERTINGGI dalam merge: lebih kuat dari Sheets maupun localStorage. */
 const _pendingDone = {};
-/* _deletedTxnIds: in-memory set ID transaksi yang sudah dihapus user session ini.
-   Mencegah syncFromSheets menarik kembali transaksi yang baru saja dihapus
-   (karena push ke Sheets mungkin belum selesai saat sync berikutnya berjalan). */
-const _deletedTxnIds = new Set();
+/* _deletedTxnIds: tombstone transaksi yang dihapus user.
+   Disimpan di localStorage (si_txns_tombstone) agar bertahan setelah refresh.
+   Entry dibersihkan otomatis setelah 3 hari agar tidak menumpuk.
+   Format tombstone: [{id, ts}] */
+function _loadTombstone(){
+  const raw = _lsLoad('si_txns_tombstone', []);
+  const cutoff = Date.now() - 3*24*60*60*1000; /* 3 hari */
+  return raw.filter(e => e.ts > cutoff);
+}
+function _saveTombstone(arr){ _lsSave('si_txns_tombstone', arr); }
+function _addTombstone(id){
+  const arr = _loadTombstone();
+  const sid = String(id);
+  if(!arr.find(e=>String(e.id)===sid)){
+    arr.push({id:sid, ts:Date.now()});
+    _saveTombstone(arr);
+  }
+}
+function _inTombstone(id){
+  const sid = String(id);
+  return _loadTombstone().some(e => String(e.id)===sid);
+}
+const _deletedTxnIds = new Set(_loadTombstone().map(e=>e.id)); /* init dari localStorage */
 /* _syncErrCount: hitung berapa kali berturut-turut sync gagal.
    Tampilkan Sync Error HANYA setelah 2x gagal berturut — 1x gagal dianggap wajar (Apps Script lambat). */
 let _syncErrCount = 0;
@@ -1053,13 +1072,27 @@ async function syncFromSheets(){
        Ini memastikan cabang selalu bisa baca data dari Sheets, bukan hanya lokal. */
     if(txns !== null){
       /* Filter: jangan restore transaksi yang sudah dihapus user session ini */
-      const sheetTxnsFiltered = txns.filter(t => !_deletedTxnIds.has(t.id) && !_deletedTxnIds.has(String(t.id)));
+      const sheetTxnsFiltered = txns.filter(t => !_inTombstone(t.id)); /* cek memory + localStorage */
       const sheetTxnIds  = new Set(sheetTxnsFiltered.map(t=>String(t.id)));
       const localTxns    = _lsLoad('si_txns', []);
       const localNewTxns = localTxns.filter(t=>!sheetTxnIds.has(String(t.id)));
       /* Gabungkan Sheets (tanpa yang dihapus) + transaksi lokal yang belum ada */
       const mergedTxns = [...sheetTxnsFiltered, ...localNewTxns];
       _lsSave('si_txns', mergedTxns);
+      /* Update counter txnNo → ambil nilai tertinggi yang ada di Sheets agar tidak overlap */
+      const yr = new Date().getFullYear();
+      const ctr = _lsLoad('si_txn_ctr', {year:0, last:0});
+      let maxNum = ctr.year===yr ? ctr.last : 0;
+      mergedTxns.forEach(t=>{
+        if(t.txnNo && t.txnNo.includes('-'+yr+'-')){
+          const parts = t.txnNo.split('-');
+          const n = parseInt(parts[parts.length-1]);
+          if(!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+      if(maxNum > (ctr.year===yr ? ctr.last : 0)){
+        _lsSave('si_txn_ctr', {year:yr, last:maxNum});
+      }
       /* Kalau ada transaksi lokal baru → kirim semua ke Sheets */
       if(localNewTxns.length > 0) setTimeout(pushAllTxnsToSheets, 600);
     }
@@ -1492,6 +1525,22 @@ function relDate(iso){const d=new Date(iso),n=new Date();const diff=Math.floor((
 /* ═══════════════════════════════════════════════
    SAMPLE DATA SEED
 ═══════════════════════════════════════════════ */
+/* ── generateTxnNo: buat nomor transaksi SI-YYYY-XXXXXX ──
+   Counter disimpan di localStorage per tahun.
+   Reset otomatis setiap tahun baru.
+   Format: SI-2026-000001, SI-2026-000002, dst.
+   Prefix user agar tidak collision antar browser:
+   master→MST, manager→MGR, tiktok→TIK, shopee→SHP, offline→OFF */
+function generateTxnNo(){
+  const yr   = new Date().getFullYear();
+  const ctr  = loadLS('si_txn_ctr', {year:0, last:0});
+  const next = ctr.year === yr ? ctr.last + 1 : 1;
+  saveLS('si_txn_ctr', {year:yr, last:next});
+  const prefixMap = {master:'MST',manager:'MGR',tiktok:'TIK',shopee:'SHP',offline:'OFF'};
+  const pfx = prefixMap[currentUser] || 'USR';
+  return `SI-${yr}-${pfx}-${String(next).padStart(4,'0')}`;
+}
+
 function seedData(){
   if(loadLS('si_seeded2',false))return;
   const salesList=['Ahmad Fauzi','Budi Santoso','Siti Rahayu','Rudi Hakim'];
@@ -1924,7 +1973,7 @@ function submitTxn(){
   if(!date||!sales||!customer||!product||!amount){
     alert('Lengkapi semua field wajib (*)');return;
   }
-  const newTxn={id:Date.now(),date,salesName:sales,customerName:customer,productName:product,qty,amount,platform:document.getElementById('txn-platform').value,inputAt:new Date().toISOString(),inputBy:currentUser||''};
+  const newTxn={id:Date.now(),txnNo:generateTxnNo(),date,salesName:sales,customerName:customer,productName:product,qty,amount,platform:document.getElementById('txn-platform').value,inputAt:new Date().toISOString(),inputBy:currentUser||''};
   const txns=getTxns();
   txns.push(newTxn);
   saveLS('si_txns',txns);
@@ -2812,7 +2861,7 @@ function renderHistTabel(txns){
 
 function deleteTxnFromHistory(id){
   if(!confirm('Hapus transaksi ini?'))return;
-  _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
+  _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
   saveLS('si_txns',getTxns().filter(t=>t.id!==id));
   pushAllTxnsToSheets();
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi ID ${id}`});
@@ -2875,24 +2924,29 @@ function renderTxnList(){
   const wrap=document.getElementById('txn-list-wrap');
   if(!allTxns.length){wrap.innerHTML='<div class="empty-state">Tidak ada transaksi ditemukan.</div>';_txnUpdateSelCount();return}
 
+  const selIds = new Set([..._txnSelected].map(x=>Number(x)));
   wrap.innerHTML=`
   <table class="data-table" style="font-size:12px">
     <thead>
       <tr>
         <th style="width:32px"><input type="checkbox" id="chk-all-txn" onchange="txnToggleAll(this.checked)" title="Pilih semua"></th>
+        <th style="font-size:10px">No Transaksi</th>
         <th>Tanggal</th><th>Sales</th><th>Customer</th><th>Produk</th><th style="text-align:center">Qty</th><th>Amount</th><th style="width:80px">Aksi</th>
       </tr>
     </thead>
     <tbody>`+
-    allTxns.map(t=>`
-    <tr id="txnrow-${t.id}" style="${_txnSelected.has(t.id)?'background:#fff3f3':''}">
+    allTxns.map(t=>{
+      const isSelected = selIds.has(Number(t.id));
+      return `
+    <tr id="txnrow-${t.id}" style="${isSelected?'background:#fff3f3':''}">
       <td style="text-align:center">
-        <input type="checkbox" class="txn-chk" data-id="${t.id}" onchange="txnToggleOne(${t.id},this.checked)" ${_txnSelected.has(t.id)?'checked':''}>
+        <input type="checkbox" class="txn-chk" data-id="${t.id}" onchange="txnToggleOne(${t.id},this.checked)" ${isSelected?'checked':''}>
       </td>
+      <td style="font-size:10px;color:#888;white-space:nowrap">${escH(t.txnNo||'–')}</td>
       <td style="white-space:nowrap;font-size:11px">${String(t.date).split('T')[0]}</td>
       <td style="font-size:11px;white-space:nowrap">${escH(t.salesName||'')}</td>
       <td style="font-size:11.5px">${escH(t.customerName||'')}</td>
-      <td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.productName||'')}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(t.productName||'')}</td>
       <td style="text-align:center">${t.qty}</td>
       <td style="white-space:nowrap;font-weight:700;color:#0f3460">${idr(t.amount)}</td>
       <td>
@@ -2901,7 +2955,7 @@ function renderTxnList(){
           <button class="act-btn act-btn-del" onclick="deleteTxnById(${t.id})" title="Hapus">🗑</button>
         </div>
       </td>
-    </tr>`).join('')+
+    </tr>`;}).join('')+
   '</tbody></table>';
   _txnUpdateSelCount();
 }
@@ -2924,7 +2978,15 @@ function txnToggleAll(checked){
   _txnUpdateSelCount();
 }
 
-function txnSelectAll(){ document.getElementById('chk-all-txn').checked=true; txnToggleAll(true); }
+function txnSelectAll(){
+  /* Pilih SEMUA dari array getTxns() — bukan hanya dari DOM yang ter-render */
+  const search=(document.getElementById('txn-search')?.value||'').toLowerCase();
+  getTxns().filter(t=>{
+    if(!search) return true;
+    return t.customerName?.toLowerCase().includes(search)||t.salesName?.toLowerCase().includes(search)||t.productName?.toLowerCase().includes(search);
+  }).forEach(t=>{ _txnSelected.add(t.id); _txnSelected.add(Number(t.id)); });
+  renderTxnList();
+}
 function txnDeselectAll(){ _txnSelected.clear(); renderTxnList(); }
 
 function _txnUpdateSelCount(){
@@ -2946,7 +3008,7 @@ function txnBulkDelete(){
   });
   txns=txns.filter(x=>!_txnSelected.has(x.id));
   /* Catat semua ID yang dihapus agar sync tidak menarik balik dari Sheets */
-  _txnSelected.forEach(id=>{ _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); });
+  _txnSelected.forEach(id=>{ _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); });
   saveLS('si_txns',txns);
   _txnSelected.clear();
   pushAllTxnsToSheets();
@@ -2995,7 +3057,7 @@ function saveEditTxn(){
 function deleteTxnById(id){
   if(!confirm('Hapus transaksi ini? Tindakan tidak bisa dibatalkan.'))return;
   const t=getTxns().find(x=>x.id===id);
-  _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); /* cegah sync balik */
+  _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
   saveLS('si_txns',getTxns().filter(x=>x.id!==id));
   pushAllTxnsToSheets();
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi${t?` ${t.customerName} · ${idr(t.amount)}`:' ID '+id}`});
