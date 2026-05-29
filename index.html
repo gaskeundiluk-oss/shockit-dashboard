@@ -960,11 +960,14 @@ function apiGet(action){
 async function apiPost(body){
   if(!SHEETS_URL) return false;
   try{
+    /* mode:'no-cors' → browser tidak blokir POST ke domain lain (Apps Script).
+       Response akan opaque (tidak bisa dibaca) tapi data TETAP diterima Apps Script.
+       Ini diperlukan karena GitHub Pages origin berbeda dari script.google.com. */
     await fetch(SHEETS_URL,{
       method :'POST',
+      mode   :'no-cors',
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body   :JSON.stringify(body),
-      redirect:'follow'
+      body   :JSON.stringify(body)
     });
     return true;
   }catch(e){
