@@ -995,12 +995,37 @@ async function syncFromSheets(){
   _syncStartTime  = Date.now();
   showSyncBadge('ing');
   try{
-    /* Semua request HARUS sequential — JSONP race condition kalau parallel */
-    const tasks     = await apiGet('getTasks');
-    const pins      = await apiGet('getPins');
-    const targets   = await apiGet('getTargets');
-    const txns      = await apiGet('getTxns');
-    const followups = await apiGet('getFollowups');
+    /* ── Coba getAllData dulu (1 request = hemat 4 cold start) ──
+       Kalau berhasil → pakai hasilnya.
+       Kalau gagal (null / Apps Script lama belum punya getAllData) → fallback ke 5 request terpisah. */
+    let tasks = null, pins = null, targets = null, txns = null, followups = null;
+
+    const allData = await apiGet('getAllData');
+
+    if(allData && typeof allData === 'object' && ('tasks' in allData || 'txns' in allData)){
+      /* getAllData berhasil — ekstrak masing-masing */
+      tasks     = allData.tasks     !== undefined ? allData.tasks     : null;
+      pins      = allData.pins      !== undefined ? allData.pins      : null;
+      targets   = allData.targets   !== undefined ? allData.targets   : null;
+      txns      = allData.txns      !== undefined ? allData.txns      : null;
+      followups = allData.followups !== undefined ? allData.followups : null;
+      /* Log error per-tipe kalau ada */
+      if(allData.tasksErr)     console.warn('[getAllData] tasks error:',     allData.tasksErr);
+      if(allData.pinsErr)      console.warn('[getAllData] pins error:',      allData.pinsErr);
+      if(allData.targetsErr)   console.warn('[getAllData] targets error:',   allData.targetsErr);
+      if(allData.txnsErr)      console.warn('[getAllData] txns error:',      allData.txnsErr);
+      if(allData.followupsErr) console.warn('[getAllData] followups error:', allData.followupsErr);
+      console.log('[sync] getAllData OK — 1 request saja ✓');
+    } else {
+      /* Fallback: Apps Script lama atau getAllData gagal → 5 request terpisah */
+      console.warn('[sync] getAllData gagal/null, fallback ke 5 request terpisah...');
+      tasks     = await apiGet('getTasks');
+      pins      = await apiGet('getPins');
+      targets   = await apiGet('getTargets');
+      txns      = await apiGet('getTxns');
+      followups = await apiGet('getFollowups');
+      console.log('[sync] fallback selesai');
+    }
 
     /* ── Update transaksi ──
        MERGE: Sheets adalah sumber kebenaran utama.
