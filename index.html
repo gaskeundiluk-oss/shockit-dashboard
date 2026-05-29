@@ -1056,13 +1056,19 @@ async function syncFromSheets(){
       if(allData.followupsErr) console.warn('[getAllData] followups error:', allData.followupsErr);
       console.log('[sync] getAllData OK — 1 request saja ✓');
     } else {
-      /* Fallback: Apps Script lama atau getAllData gagal → 5 request terpisah */
-      console.warn('[sync] getAllData gagal/null, fallback ke 5 request terpisah...');
+      /* Fallback: Apps Script lama atau getAllData gagal → 5+1 request terpisah */
+      console.warn('[sync] getAllData gagal/null, fallback ke request terpisah...');
       tasks     = await apiGet('getTasks');
       pins      = await apiGet('getPins');
       targets   = await apiGet('getTargets');
       txns      = await apiGet('getTxns');
       followups = await apiGet('getFollowups');
+      /* Juga baca deletedTxnIds untuk filter */
+      const deletedData = await apiGet('getDeletedTxns');
+      if(deletedData && Array.isArray(deletedData)){
+        if(!allData) allData = {};
+        allData.deletedTxnIds = deletedData;
+      }
       console.log('[sync] fallback selesai');
     }
 
@@ -1071,15 +1077,27 @@ async function syncFromSheets(){
        Transaksi lokal yang belum di Sheets → push semuanya ke Sheets (bulk replace).
        Ini memastikan cabang selalu bisa baca data dari Sheets, bukan hanya lokal. */
     if(txns !== null){
-      /* Filter: jangan restore transaksi yang sudah dihapus user session ini */
-      const sheetTxnsFiltered = txns.filter(t => !_inTombstone(t.id)); /* cek memory + localStorage */
-      const sheetTxnIds  = new Set(sheetTxnsFiltered.map(t=>String(t.id)));
+      /* ── Daftar hitam terpusat: gabung tombstone lokal + Deleted_Txns dari Sheets ──
+         Transaksi yang ada di sini TIDAK AKAN di-restore ke device manapun. */
+      const sheetsDeletedIds = new Set(
+        (allData && Array.isArray(allData.deletedTxnIds) ? allData.deletedTxnIds : []).map(String)
+      );
+      _loadTombstone().forEach(e => sheetsDeletedIds.add(String(e.id)));
+
+      /* Filter: buang semua yang ada di daftar hitam */
+      const sheetTxnsFiltered = txns.filter(t => !sheetsDeletedIds.has(String(t.id)));
+      const sheetTxnIds = new Set(sheetTxnsFiltered.map(t => String(t.id)));
+
+      /* Transaksi lokal baru: ada di lokal, tidak di Sheets, tidak di daftar hitam */
       const localTxns    = _lsLoad('si_txns', []);
-      const localNewTxns = localTxns.filter(t=>!sheetTxnIds.has(String(t.id)));
-      /* Gabungkan Sheets (tanpa yang dihapus) + transaksi lokal yang belum ada */
+      const localNewTxns = localTxns.filter(t =>
+        !sheetTxnIds.has(String(t.id)) && !sheetsDeletedIds.has(String(t.id))
+      );
+
       const mergedTxns = [...sheetTxnsFiltered, ...localNewTxns];
       _lsSave('si_txns', mergedTxns);
-      /* Update counter txnNo → ambil nilai tertinggi yang ada di Sheets agar tidak overlap */
+
+      /* Update counter txnNo */
       const yr = new Date().getFullYear();
       const ctr = _lsLoad('si_txn_ctr', {year:0, last:0});
       let maxNum = ctr.year===yr ? ctr.last : 0;
@@ -1093,8 +1111,15 @@ async function syncFromSheets(){
       if(maxNum > (ctr.year===yr ? ctr.last : 0)){
         _lsSave('si_txn_ctr', {year:yr, last:maxNum});
       }
-      /* Kalau ada transaksi lokal baru → kirim semua ke Sheets */
-      if(localNewTxns.length > 0) setTimeout(pushAllTxnsToSheets, 600);
+
+      /* ── Push: hanya kirim transaksi BARU via addTxn (incremental) ──
+         BUKAN setAllTxns — agar device lain tidak menimpa dengan txn yang sudah dihapus */
+      if(localNewTxns.length > 0){
+        localNewTxns.forEach((t, i) => {
+          setTimeout(() => apiPost({action:'addTxn', data:t}), i * 150);
+        });
+        console.log('[sync] push', localNewTxns.length, 'transaksi baru (incremental)');
+      }
     }
     if(targets !== null) _lsSave('si_targets', targets);
 
@@ -1128,8 +1153,19 @@ async function syncFromSheets(){
 
       let needPush = false;
 
+      /* Cek apakah today tasks baru saja di-reset — jangan restore dari Sheets */
+      const _todayResetDone = _lsLoad('si_today_reset_done','');
+      const _isResetDay = (_todayResetDone === todayStr());
+
       allKeys.forEach(key=>{
         const [scope, divKey] = key.split('__');
+
+        /* Jika hari ini adalah hari reset dan scope = today → skip restore dari Sheets */
+        if(_isResetDay && scope === 'today'){
+          _lsSave(`si_tasks_today_${divKey}`, []); /* pastikan tetap kosong */
+          return;
+        }
+
         const sheetsArr = sheetsBuckets[key] || [];
         const localArr  = _lsLoad(`si_tasks_${scope}_${divKey}`, []);
 
@@ -1516,10 +1552,47 @@ function relDate(iso){const d=new Date(iso),n=new Date();const diff=Math.floor((
    GREETING & DATE
 ═══════════════════════════════════════════════ */
 (function(){
-  const h=new Date().getHours();
-  document.getElementById('greeting').textContent=h<11?'Selamat Pagi! ☀️':h<15?'Selamat Siang! 🌤️':h<18?'Selamat Sore! 🌅':'Selamat Malam! 🌙';
-  const d=new Date();
-  document.getElementById('dateDisplay').textContent=`${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+  /* Deteksi timezone: tampilkan singkatan lokal */
+  function getTimezoneLabel(){
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    const tzMap = {
+      'Asia/Jakarta':'WIB','Asia/Pontianak':'WIB',
+      'Asia/Makassar':'WITA','Asia/Balikpapan':'WITA',
+      'Asia/Jayapura':'WIT',
+      'Asia/Singapore':'SGT','Asia/Kuala_Lumpur':'MYT',
+      'Asia/Bangkok':'ICT','Asia/Tokyo':'JST','Asia/Seoul':'KST',
+      'Asia/Shanghai':'CST','Asia/Hong_Kong':'HKT',
+      'Europe/London':'GMT','America/New_York':'EST',
+      'America/Los_Angeles':'PST','Australia/Sydney':'AEDT',
+    };
+    if(tzMap[tz]) return tzMap[tz];
+    /* Fallback: UTC offset */
+    const off = -new Date().getTimezoneOffset();
+    const h = Math.floor(Math.abs(off)/60).toString().padStart(2,'0');
+    const m = (Math.abs(off)%60).toString().padStart(2,'0');
+    return (off>=0?'UTC+':'UTC-')+h+':'+m;
+  }
+
+  function updateDateTime(){
+    const d = new Date();
+    const h = d.getHours();
+    /* Greeting */
+    const greet = h<11?'Selamat Pagi! ☀️':h<15?'Selamat Siang! 🌤️':h<18?'Selamat Sore! 🌅':'Selamat Malam! 🌙';
+    const gEl = document.getElementById('greeting');
+    if(gEl) gEl.textContent = greet;
+    /* Jam & tanggal */
+    const hh = String(h).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    const ss = String(d.getSeconds()).padStart(2,'0');
+    const tz = getTimezoneLabel();
+    const dateStr = `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`;
+    const timeStr = `${hh}:${mm}:${ss} ${tz}`;
+    const dEl = document.getElementById('dateDisplay');
+    if(dEl) dEl.innerHTML = `${dateStr} &nbsp;·&nbsp; <span style="font-variant-numeric:tabular-nums;letter-spacing:.3px">${timeStr}</span>`;
+  }
+
+  updateDateTime();
+  setInterval(updateDateTime, 1000); /* update setiap detik */
 })();
 
 /* ═══════════════════════════════════════════════
@@ -1977,8 +2050,8 @@ function submitTxn(){
   const txns=getTxns();
   txns.push(newTxn);
   saveLS('si_txns',txns);
-  /* sync to Sheets — push semua txns (bukan hanya satu) agar tidak ada yang hilang */
-  pushAllTxnsToSheets();
+  /* Kirim hanya txn BARU ini ke Sheets (incremental — bukan replace semua) */
+  apiPost({action:'addTxn', data:newTxn});
   /* Catat ke activity log */
   addActivityLog({action:'add_txn', data:newTxn, desc:`Input transaksi ${newTxn.customerName} · ${idr(newTxn.amount)}`});
   /* Reset form */
@@ -2863,7 +2936,7 @@ function deleteTxnFromHistory(id){
   if(!confirm('Hapus transaksi ini?'))return;
   _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
   saveLS('si_txns',getTxns().filter(t=>t.id!==id));
-  pushAllTxnsToSheets();
+  apiPost({action:'addDeletedTxn', id:String(id), deletedBy:currentUser||''});
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi ID ${id}`});
   initFilters();refreshSales();
   renderHistory();
@@ -2961,7 +3034,9 @@ function renderTxnList(){
 }
 
 function txnToggleOne(id, checked){
-  if(checked) _txnSelected.add(id); else _txnSelected.delete(id);
+  /* Simpan KEDUA versi (string & number) agar filter bekerja apapun tipe id dari localStorage/Sheets */
+  if(checked){ _txnSelected.add(id); _txnSelected.add(String(id)); _txnSelected.add(Number(id)); }
+  else { _txnSelected.delete(id); _txnSelected.delete(String(id)); _txnSelected.delete(Number(id)); }
   const row=document.getElementById('txnrow-'+id);
   if(row) row.style.background = checked?'#fff3f3':'';
   _txnUpdateSelCount();
@@ -3006,12 +3081,18 @@ function txnBulkDelete(){
     const t=txns.find(x=>x.id===id);
     addActivityLog({action:'delete_txn',txnId:id,desc:`Bulk hapus: ${t?t.customerName+' · '+idr(t.amount):'ID '+id}`});
   });
-  txns=txns.filter(x=>!_txnSelected.has(x.id));
+  /* Normalisasi: cek string & number agar tidak ada yang lolos akibat type mismatch */
+  txns=txns.filter(x=>!_txnSelected.has(x.id)&&!_txnSelected.has(String(x.id))&&!_txnSelected.has(Number(x.id)));
   /* Catat semua ID yang dihapus agar sync tidak menarik balik dari Sheets */
+  const _bulkIds = [..._txnSelected].map(id => String(id));
   _txnSelected.forEach(id=>{ _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id)); });
   saveLS('si_txns',txns);
   _txnSelected.clear();
-  pushAllTxnsToSheets();
+  /* Kirim semua ID yang dihapus ke sheet Deleted_Txns sekaligus */
+  if(_bulkIds.length > 0){
+    apiPost({action:'bulkAddDeletedTxns', ids:_bulkIds, deletedBy:currentUser||''});
+    console.log('[txnBulkDelete] kirim', _bulkIds.length, 'ID ke Deleted_Txns sheet');
+  }
   renderTxnList();initFilters();refreshSales();
 }
 
@@ -3045,8 +3126,8 @@ function saveEditTxn(){
     platform:document.getElementById('edit-txn-platform').value
   };
   saveLS('si_txns',txns);
-  /* Untuk Sheets: push semua (bulk replace lebih andal dari delete+add) */
-  pushAllTxnsToSheets();
+  /* Update di Sheets: hapus lama + tambah baru (tetap incremental) */
+  apiPost({action:'deleteTxn', id:String(id)}).then(()=>apiPost({action:'addTxn', data:txns[idx]}));
   addActivityLog({action:'edit_txn',txnId:id,desc:`Edit transaksi ${txns[idx].customerName} · ${idr(txns[idx].amount)}`});
   showSyncBadge('ok');
   const okEl=document.getElementById('edit-txn-ok');
@@ -3059,7 +3140,9 @@ function deleteTxnById(id){
   const t=getTxns().find(x=>x.id===id);
   _addTombstone(id); _deletedTxnIds.add(id); _deletedTxnIds.add(String(id));
   saveLS('si_txns',getTxns().filter(x=>x.id!==id));
-  pushAllTxnsToSheets();
+  /* Catat ke sheet Deleted_Txns + hapus dari Sheets */
+  apiPost({action:'addDeletedTxn', id:String(id), deletedBy:currentUser||''});
+  apiPost({action:'deleteTxn', id:String(id)});
   addActivityLog({action:'delete_txn',txnId:id,desc:`Hapus transaksi${t?` ${t.customerName} · ${idr(t.amount)}`:' ID '+id}`});
   renderTxnList();initFilters();refreshSales();
 }
@@ -3176,6 +3259,14 @@ if(didReset){
     n.textContent='🌅 Hari baru! Skor kemarin telah diarsip & to-do list di-reset.';
     document.body.appendChild(n);setTimeout(()=>n.remove(),4000);
   },1000);
+  /* KRITIS: Push today tasks KOSONG ke Sheets dulu sebelum sync.
+     Tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & batalkan reset. */
+  if(SHEETS_URL) setTimeout(async()=>{
+    await pushAllTasksToSheets();
+    /* Setelah push kosong selesai, baru sync (dan pakai flag agar today tasks tidak di-restore) */
+    _lsSave('si_today_reset_done', todayStr());
+    if(sessionRestored && currentUser) syncFromSheets();
+  }, 600);
 }
 seedData();
 renderTasksSection('today','todo-divisions');
@@ -3184,8 +3275,8 @@ loadNotes();
 document.getElementById('fu-date').value=todayStr();
 if(sessionRestored){
   applyRoleUI();
-  /* Sync awal saat halaman dibuka — jangan tunggu 20 detik */
-  setTimeout(syncFromSheets, 1500);
+  /* Sync awal — tapi hanya kalau BUKAN hari reset (sudah ditangani di blok didReset di atas) */
+  if(!didReset) setTimeout(syncFromSheets, 1500);
 }
 
 /* Auto-sync setiap 20 detik agar semua cabang selalu dapat data terbaru.
