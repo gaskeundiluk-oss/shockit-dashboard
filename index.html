@@ -1160,9 +1160,10 @@ async function syncFromSheets(){
       allKeys.forEach(key=>{
         const [scope, divKey] = key.split('__');
 
-        /* Jika hari ini adalah hari reset dan scope = today → skip restore dari Sheets */
+        /* Jika hari ini adalah hari reset dan scope = today → skip restore dari Sheets.
+           JANGAN hapus localStorage — checkDailyReset() sudah mengosongkannya, dan task
+           yang baru ditambahkan user di sesi ini tidak boleh ikut terhapus. */
         if(_isResetDay && scope === 'today'){
-          _lsSave(`si_tasks_today_${divKey}`, []); /* pastikan tetap kosong */
           return;
         }
 
@@ -3260,12 +3261,15 @@ if(didReset){
     document.body.appendChild(n);setTimeout(()=>n.remove(),4000);
   },1000);
   /* KRITIS: Push today tasks KOSONG ke Sheets dulu sebelum sync.
-     Tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & batalkan reset. */
+     Tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & batalkan reset.
+     Setelah 1 kali sync, flag di-clear agar sync berikutnya bisa restore task baru dari cabang. */
   if(SHEETS_URL) setTimeout(async()=>{
     await pushAllTasksToSheets();
-    /* Setelah push kosong selesai, baru sync (dan pakai flag agar today tasks tidak di-restore) */
+    /* Set flag agar 1 sync pertama skip restore today tasks (hindari restore task kemarin) */
     _lsSave('si_today_reset_done', todayStr());
-    if(sessionRestored && currentUser) syncFromSheets();
+    if(sessionRestored && currentUser) await syncFromSheets();
+    /* Clear flag — sync selanjutnya kembali normal & task dari cabang bisa masuk */
+    _lsSave('si_today_reset_done', '');
   }, 600);
 }
 seedData();
@@ -3312,22 +3316,14 @@ setInterval(()=>{
 
     /* Step 2: push today tasks KOSONG ke Sheets agar cabang lain tidak balik ke task kemarin */
     if(SHEETS_URL){
-      pushAllTasksToSheets().then(()=>{
+      pushAllTasksToSheets().then(async()=>{
+        /* Set flag agar 1 sync pertama skip restore (hindari task kemarin kembali) */
+        _lsSave('si_today_reset_done', todayStr());
         /* Step 3: sync ulang dari Sheets (today tasks sudah kosong) */
-        if(currentUser && SHEETS_URL) syncFromSheets();
+        if(currentUser && SHEETS_URL) await syncFromSheets();
+        /* Clear flag — sync selanjutnya normal; task baru dari cabang bisa masuk */
+        _lsSave('si_today_reset_done', '');
       });
     }
 
-    /* Step 4: re-render & notifikasi */
-    renderTasksSection('today','todo-divisions');
-    updateTodoSummary();
-    const n=document.createElement('div');
-    n.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border-radius:12px;padding:12px 22px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3)';
-    n.textContent='🌅 Tengah malam! Skor diarsip & to-do list baru siap untuk hari ini.';
-    document.body.appendChild(n);
-    setTimeout(()=>n.remove(), 6000);
-  }
-}, 60000); /* cek setiap 60 detik */
-</script>
-</body>
-</html>
+    /* Step 4: re-render & no
