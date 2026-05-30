@@ -1,19 +1,4 @@
 <!DOCTYPE html>
-<script type="application/json" id="cowork-artifact-meta">
-{
-  "name": "Sales Morning Briefing",
-  "schemaVersion": 1,
-  "description": "Dashboard SHOCK IT — tab Jadwal (to-do per divisi, plan besok, strategi minggu, follow-up customer) + tab Sales (pencapaian vs target, top 20 customer & produk, proyeksi hari kerja) + Catatan.",
-  "mcpTools": [
-    "mcp__7a406e96-840f-4501-99fe-93faecf2b49f__search_files",
-    "mcp__c17bfd5d-6c53-4fa8-b360-60925f481b26__list_events"
-  ],
-  "mcpServerNames": [
-    "Google Drive",
-    "Google Calendar"
-  ]
-}
-</script>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -554,6 +539,11 @@
   <div class="card" id="hist-card" style="display:none">
     <div class="card-header"><span class="section-label">📋 Catatan Sebelumnya</span></div>
     <div id="hist-content"></div>
+  </div>
+  <!-- Panel catatan tim — hanya tampil untuk master/manager, read-only -->
+  <div class="card" id="team-notes-card" style="display:none">
+    <div class="card-header"><span class="section-label">👥 Catatan Tim (Baca Saja)</span></div>
+    <div id="team-notes-content"><p style="color:#aaa;font-size:12px;padding:8px 0">Belum ada catatan dari tim.</p></div>
   </div>
 </div>
 
@@ -1208,13 +1198,59 @@ async function syncFromSheets(){
         _lsSave(`si_tasks_${scope}_${divKey}`, deduped);
       });
 
-      /* Kalau ada task lokal baru, push ke Sheets */
-      if(needPush) setTimeout(pushAllTasksToSheets, 500);
+      /* Kalau ada task lokal baru, push ke Sheets satu per satu (per ID) */
+      if(needPush){
+        ['today','tomorrow','week'].forEach(sc=>{
+          DIVISIONS.forEach(d=>{
+            const local=_lsLoad(`si_tasks_${sc}_${d.key}`,[]);
+            const shBkt=sheetsBuckets[`${sc}__${d.key}`]||[];
+            const shIds=new Set(shBkt.map(t=>String(t.id)));
+            local.filter(t=>!shIds.has(String(t.id))).forEach(t=>{
+              if(SHEETS_URL) apiPost({action:'addTask', data:{...t, scope:sc, divKey:d.key}});
+            });
+          });
+        });
+      }
     }
 
     /* ── Update followups & pins ── */
     if(followups !== null) _lsSave('si_followups', followups.map(f=>({...f,id:Number(f.id)||f.id})));
     if(pins      !== null) _lsSave('si_pins', pins);
+
+    /* ── Merge Promos dari Sheets ── */
+    const sheetsPromos = allData?.promos;
+    if(Array.isArray(sheetsPromos)){
+      const deletedPromoIds = new Set(_lsLoad('si_deleted_promo_ids',[]).map(String));
+      const localPromos     = _lsLoad('si_promos',[]);
+      const localPromoIds   = new Set(localPromos.map(p=>String(p.id)));
+      /* Tambahkan promo dari Sheets yang belum ada di lokal dan belum dihapus */
+      const newFromSheets   = sheetsPromos.filter(p=>!localPromoIds.has(String(p.id))&&!deletedPromoIds.has(String(p.id)));
+      /* Update done status dari Sheets untuk promo yang sudah ada */
+      const merged = localPromos.map(p=>{
+        const sp=sheetsPromos.find(x=>String(x.id)===String(p.id));
+        return sp ? {...p, done:sp.done} : p;
+      });
+      merged.push(...newFromSheets);
+      _lsSave('si_promos', merged);
+    }
+
+    /* ── Merge Strategies dari Sheets ── */
+    const sheetsStrats = allData?.strategies;
+    if(sheetsStrats && typeof sheetsStrats==='object'){
+      Object.entries(sheetsStrats).forEach(([divKey, s])=>{
+        const local = _lsLoad(`si_strategy_${divKey}`,'');
+        /* Pakai versi Sheets jika lebih baru (atau lokal kosong) */
+        if(!local || (s.updatedAt && local !== s.text)){
+          _lsSave(`si_strategy_${divKey}`, s.text||'');
+        }
+      });
+    }
+
+    /* ── Simpan Notes Tim (untuk ditampilkan di pusat) ── */
+    const sheetsNotes = allData?.notes;
+    if(Array.isArray(sheetsNotes) && sheetsNotes.length){
+      _lsSave('si_team_notes', sheetsNotes);
+    }
 
     _syncErrCount = 0; /* reset counter error saat berhasil */
     showSyncBadge('ok');
@@ -1224,6 +1260,7 @@ async function syncFromSheets(){
       renderTasksSection('today','todo-divisions');
       renderPromos();
       renderFollowups();
+      renderTeamNotes();
       if(document.getElementById('tab-sales')?.classList.contains('active')){
         initFilters(); refreshSales();
       }
@@ -1545,6 +1582,10 @@ function saveLS(k,v){_lsSave(k,v)}
 function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function idr(n){return 'Rp '+Math.round(n).toLocaleString('id-ID')}
 function todayStr(){return new Date().toISOString().split('T')[0]}
+/* genId: composite ID bebas collision antar-device
+   Format: {user}_{timestamp}_{random3char}
+   Contoh: tiktok_1748611234567_a7f */
+function genId(){return `${(currentUser||'x')}_${Date.now()}_${Math.random().toString(36).slice(2,5)}`}
 function pct(a,b){return b?Math.min(Math.round(a/b*100),999):0}
 function pctColor(p){return p>=100?'pct-good':p>=70?'pct-warn':'pct-bad'}
 function relDate(iso){const d=new Date(iso),n=new Date();const diff=Math.floor((n-d)/86400000);if(diff===0)return'Hari ini';if(diff===1)return'Kemarin';if(diff<7)return diff+' hari lalu';return d.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}
@@ -2208,10 +2249,11 @@ function addTask(scope,divKey){
   }
   const inp=document.getElementById(`ai-${scope}-${divKey}`);
   const text=inp.value.trim();if(!text)return;
-  const newTask={id:Date.now(),text,done:false};
+  /* Composite ID — bebas collision antar-device */
+  const newTask={id:genId(),text,done:false,createdBy:currentUser||'',createdAt:Date.now()};
   const tasks=getTasks(scope,divKey);tasks.push(newTask);saveTasks(scope,divKey,tasks);inp.value='';
-  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets tidak menumpuk duplikat */
-  pushAllTasksToSheets();
+  /* Kirim 1 task saja — tidak overwrite task dari device lain */
+  if(SHEETS_URL) apiPost({action:'addTask', data:{...newTask, scope, divKey}}).then(ok=>showSyncBadge(ok?'ok':'err'));
   const containerId=scope==='today'?'todo-divisions':'week-divisions';
   renderTasksSection(scope,containerId);
 }
@@ -2224,8 +2266,8 @@ function toggleTask(scope,divKey,idx,checked){
   saveTasks(scope,divKey,tasks);
   /* Daftarkan ke _pendingDone — in-memory, prioritas tertinggi saat merge sync */
   _pendingDone[String(tasks[idx].id)] = checked;
-  /* Push ke Sheets agar master/manager langsung lihat update ceklist */
-  pushAllTasksToSheets();
+  /* Update atomik per ID — tidak overwrite task lain */
+  if(SHEETS_URL) apiPost({action:'updateTaskDone', id:String(tasks[idx].id), done:checked}).then(ok=>showSyncBadge(ok?'ok':'err'));
   const span=document.querySelector(`#ti-${scope}-${divKey}-${idx} .task-text`);
   if(span)span.className='task-text'+(checked?' done':'');
   if(scope==='today')updateTodoSummary();
@@ -2237,9 +2279,10 @@ function toggleTask(scope,divKey,idx,checked){
 
 function deleteTask(scope,divKey,idx){
   const tasks=getTasks(scope,divKey);
+  const removed=tasks[idx];
   tasks.splice(idx,1);saveTasks(scope,divKey,tasks);
-  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets bersih */
-  pushAllTasksToSheets();
+  /* Hapus atomik per ID — tidak mengganggu task dari device lain */
+  if(SHEETS_URL&&removed) apiPost({action:'deleteTask', id:String(removed.id)}).then(ok=>showSyncBadge(ok?'ok':'err'));
   if(scope==='today') renderTasksSection(scope,'todo-divisions');
   else if(scope==='tomorrow') renderPromos();
   else renderTasksSection(scope,'week-divisions');
@@ -2281,7 +2324,13 @@ function renderWeek(){
   wrap.dataset.built='1';updateCarryTip();
 }
 
-function saveStrategy(divKey){const val=document.getElementById(`strat-${divKey}`).value;saveLS(`si_strategy_${divKey}`,val);const ok=document.getElementById(`strat-ok-${divKey}`);ok.style.display='inline';setTimeout(()=>ok.style.display='none',2000)}
+function saveStrategy(divKey){
+  const val=document.getElementById(`strat-${divKey}`).value;
+  saveLS(`si_strategy_${divKey}`,val);
+  /* Sync ke Sheets — upsert per divKey, tersebar ke semua device */
+  if(SHEETS_URL) apiPost({action:'setStrategy', divKey, text:val, updatedBy:currentUser||'', updatedAt:new Date().toISOString()}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  const okEl=document.getElementById(`strat-ok-${divKey}`);okEl.style.display='inline';setTimeout(()=>okEl.style.display='none',2000);
+}
 
 function updateCarryTip(){
   const incomplete=[];
@@ -2301,7 +2350,7 @@ function addFollowup(){
   const customer=document.getElementById('fu-customer').value.trim();const date=document.getElementById('fu-date').value;
   if(!customer||!date){alert('Nama customer dan tanggal wajib diisi!');return}
   const fu=getFollowups();
-  fu.unshift({id:Date.now(),customer,date,time:document.getElementById('fu-time').value,div:document.getElementById('fu-div').value,channel:document.getElementById('fu-channel').value.trim(),notes:document.getElementById('fu-notes').value.trim(),status:'pending',created:new Date().toISOString()});
+  fu.unshift({id:genId(),customer,date,time:document.getElementById('fu-time').value,div:document.getElementById('fu-div').value,channel:document.getElementById('fu-channel').value.trim(),notes:document.getElementById('fu-notes').value.trim(),status:'pending',created:new Date().toISOString()});
   saveFollowups(fu);
   apiPost({action:'addFollowup',data:fu[0]}).then(ok=>showSyncBadge(ok?'ok':'err'));
   ['fu-customer','fu-date','fu-time','fu-channel','fu-notes'].forEach(id=>document.getElementById(id).value='');
@@ -2365,24 +2414,34 @@ function addPromo(){
   if(!text){alert('Nama promo tidak boleh kosong');return}
   if(!start||!deadline){alert('Tanggal mulai dan deadline harus diisi');return}
   if(deadline<start){alert('Deadline tidak boleh sebelum tanggal mulai');return}
+  const newPromo={id:genId(),text,start,deadline,div,done:false,created:todayStr(),createdBy:currentUser||''};
   const promos=getPromos();
-  promos.unshift({id:Date.now(),text,start,deadline,div,done:false,created:todayStr()});
+  promos.unshift(newPromo);
   savePromos(promos);
   document.getElementById('promo-text').value='';
   document.getElementById('promo-start').value='';
   document.getElementById('promo-deadline').value='';
+  /* Sync ke Sheets — per ID, tidak overwrite promo dari device lain */
+  if(SHEETS_URL) apiPost({action:'addPromo', data:newPromo}).then(ok=>showSyncBadge(ok?'ok':'err'));
   renderPromos();
 }
 
 function togglePromoDone(id){
   const promos=getPromos();
-  const p=promos.find(x=>x.id===id);
-  if(p){p.done=!p.done;savePromos(promos);renderPromos();}
+  const p=promos.find(x=>x.id===id||String(x.id)===String(id));
+  if(p){
+    p.done=!p.done;savePromos(promos);
+    if(SHEETS_URL) apiPost({action:'togglePromo', id:String(p.id), done:p.done}).then(ok=>showSyncBadge(ok?'ok':'err'));
+    renderPromos();
+  }
 }
 
 function deletePromo(id){
   if(!confirm('Hapus promo ini?'))return;
-  savePromos(getPromos().filter(x=>x.id!==id));
+  savePromos(getPromos().filter(x=>x.id!==id&&String(x.id)!==String(id)));
+  /* Catat ID yang dihapus agar tidak di-restore saat sync */
+  const del=_lsLoad('si_deleted_promo_ids',[]);del.push(String(id));_lsSave('si_deleted_promo_ids',del);
+  if(SHEETS_URL) apiPost({action:'deletePromo', id:String(id)}).then(ok=>showSyncBadge(ok?'ok':'err'));
   renderPromos();
 }
 
@@ -2565,15 +2624,18 @@ function calcDivSkor(divKey, dateStr){
   return Math.round(done/tasks.length*100);
 }
 
-/* Auto-reset: saat buka dashboard di hari baru, arsip skor kemarin lalu reset */
+/* Auto-reset: saat buka dashboard di hari baru, arsip skor kemarin lalu reset.
+   Mengembalikan array ID task kemarin (untuk bulkDeleteTasks ke Sheets),
+   atau null jika tidak ada reset yang perlu dilakukan. */
 function checkDailyReset(){
   const lastDate=loadLS('si_last_open_date','');
   const today=todayStr();
 
   /* Sudah diproses hari ini → tidak perlu reset lagi */
-  if(lastDate===today) return false;
+  if(lastDate===today) return null;
 
-  /* Ada task lama yang perlu diarsip */
+  /* Kumpulkan ID semua task hari ini SEBELUM dihapus (untuk dikirim ke Sheets) */
+  const archivedTaskIds=[];
   const hasOldTasks=DIVISIONS.some(div=>getTasks('today',div.key).length>0);
 
   if(hasOldTasks){
@@ -2581,6 +2643,7 @@ function checkDailyReset(){
     const hist=getSkorHistory();
     DIVISIONS.forEach(div=>{
       const tasks=getTasks('today',div.key);
+      tasks.forEach(t=>archivedTaskIds.push(String(t.id)));
       if(tasks.length){
         const done=tasks.filter(t=>t.done).length;
         const skor=Math.round(done/tasks.length*100);
@@ -2600,9 +2663,9 @@ function checkDailyReset(){
 
   /* Tandai sudah diproses hari ini — tidak akan reset lagi sampai besok */
   saveLS('si_last_open_date', today);
-  /* Simpan flag agar syncFromSheets tidak menimpa task kosong hari ini */
   saveLS('si_reset_date', today);
-  return hasOldTasks;
+  /* Kembalikan array ID (bisa kosong [] jika tidak ada task, tapi tetap bukan null → reset terjadi) */
+  return archivedTaskIds;
 }
 
 function getGrade(skor){
@@ -3215,10 +3278,11 @@ function saveEditTask(){
   if(!text){alert('Teks task tidak boleh kosong');return}
   const tasks=getTasks(scope,divKey);
   if(!tasks[idx])return;
+  const taskBeforeEdit=tasks[idx];
   tasks[idx].text=text;
   saveTasks(scope,divKey,tasks);
-  /* Kirim SEMUA task sekaligus (replace penuh) agar Sheets selalu sinkron */
-  pushAllTasksToSheets();
+  /* Update teks atomik per ID */
+  if(SHEETS_URL&&taskBeforeEdit) apiPost({action:'updateTaskText', id:String(taskBeforeEdit.id), text}).then(ok=>showSyncBadge(ok?'ok':'err'));
   const okEl=document.getElementById('edit-task-ok');
   okEl.style.display='block';
   setTimeout(()=>{
@@ -3232,10 +3296,13 @@ function saveEditTask(){
 /* ═══════════════════════════════════════════════
    CATATAN
 ═══════════════════════════════════════════════ */
+const USER_DISPLAY={master:'👑 Master',manager:'🧑‍💼 Manager',tiktok:'🎵 TikTok & Tokopedia',shopee:'🛒 Shopee & Blibli',offline:'🏪 Offline Sales'};
 function loadNotes(){
   const saved=localStorage.getItem('shockit_notes');if(saved)document.getElementById('notesArea').value=saved;
   const hist=loadLS('shockit_notes_hist',[]);
-  if(hist.length){document.getElementById('hist-card').style.display='';document.getElementById('hist-content').innerHTML=hist.slice(0,5).map(h=>`<div style="border-bottom:1px solid #f5f5f9;padding:9px 0"><div style="font-size:10.5px;color:#bbb;margin-bottom:3px">📅 ${h.date}</div><div style="font-size:12.5px;color:#555">${escH(h.text)}</div></div>`).join('')}
+  if(hist.length){document.getElementById('hist-card').style.display='';document.getElementById('hist-content').innerHTML=hist.slice(0,5).map(h=>`<div style="border-bottom:1px solid #f5f5f9;padding:9px 0"><div style="font-size:10.5px;color:#bbb;margin-bottom:3px">📅 ${h.date}</div><div style="font-size:12.5px;color:#555">${escH(h.t  if(hist.length){document.getElementById('hist-card').style.display='';document.getElementById('hist-content').innerHTML=hist.slice(0,5).map(h=>`<div style="border-bottom:1px solid #f5f5f9;padding:9px 0"><div style="font-size:10.5px;color:#bbb;margin-bottom:3px">📅 ${h.date}</div><div style="font-size:12.5px;color:#555">${escH(h.text)}</div></div>`).join('')}
+  /* Tampilkan panel catatan tim untuk master/manager */
+  renderTeamNotes();
 }
 function saveNotes(){
   const text=document.getElementById('notesArea').value.trim();if(!text)return;
@@ -3243,32 +3310,53 @@ function saveNotes(){
   const hist=loadLS('shockit_notes_hist',[]);const d=new Date();
   hist.unshift({date:`${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS_ID[d.getMonth()]} ${d.getFullYear()}`,text:text.substring(0,200)});
   saveLS('shockit_notes_hist',hist.slice(0,10));
+  /* Sync catatan ke Sheets — pusat bisa baca, hanya pemilik yang bisa edit */
+  if(SHEETS_URL&&currentUser){
+    const dName=USER_DISPLAY[currentUser]||currentUser;
+    apiPost({action:'saveNote', userId:currentUser, text, updatedAt:new Date().toISOString(), displayName:dName}).then(ok=>showSyncBadge(ok?'ok':'err'));
+  }
   const c=document.getElementById('saveConfirm');c.style.display='block';setTimeout(()=>{c.style.display='none';loadNotes()},2000);
+}
+function renderTeamNotes(){
+  const card=document.getElementById('team-notes-card');if(!card)return;
+  /* Hanya tampilkan ke master/manager */
+  const isMgrOrAbove=(currentRole==='master'||currentRole==='manager');
+  card.style.display=isMgrOrAbove?'':'none';
+  if(!isMgrOrAbove)return;
+  const notes=_lsLoad('si_team_notes',[]);
+  const wrap=document.getElementById('team-notes-content');
+  if(!notes.length){wrap.innerHTML='<p style="color:#aaa;font-size:12px;padding:8px 0">Belum ada catatan dari tim.</p>';return;}
+  wrap.innerHTML=notes
+    .filter(n=>n.userId!==currentUser)
+    .map(n=>`<div style="border-bottom:1px solid #f0f0f6;padding:10px 0">
+      <div style="font-size:11px;color:#888;margin-bottom:4px">
+        ${escH(n.displayName||n.userId)}
+        ${n.updatedAt?'· '+new Date(n.updatedAt).toLocaleDateString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):''}
+      </div>
+      <div style="font-size:13px;color:#333;white-space:pre-wrap">${escH(n.text)}</div>
+    </div>`).join('')||'<p style="color:#aaa;font-size:12px;padding:8px 0">Belum ada catatan dari anggota lain.</p>';
 }
 
 /* ═══════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════ */
 const sessionRestored = checkSession();
-/* Cek reset harian sebelum render task */
-const didReset = checkDailyReset();
+/* Cek reset harian sebelum render task.
+   checkDailyReset() mengembalikan array ID task kemarin (atau null jika tidak perlu reset). */
+const _archivedTaskIds = checkDailyReset();
+const didReset = _archivedTaskIds !== null;
 if(didReset){
-  /* Tampilkan notif reset */
   setTimeout(()=>{
     const n=document.createElement('div');
     n.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border-radius:12px;padding:10px 20px;font-size:13px;font-weight:600;z-index:9998;box-shadow:0 4px 20px rgba(0,0,0,.3)';
     n.textContent='🌅 Hari baru! Skor kemarin telah diarsip & to-do list di-reset.';
     document.body.appendChild(n);setTimeout(()=>n.remove(),4000);
   },1000);
-  /* KRITIS: Push today tasks KOSONG ke Sheets dulu sebelum sync.
-     Tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & batalkan reset.
-     Setelah 1 kali sync, flag di-clear agar sync berikutnya bisa restore task baru dari cabang. */
+  /* Hapus task kemarin dari Sheets per ID (bukan replace-all) */
   if(SHEETS_URL) setTimeout(async()=>{
-    await pushAllTasksToSheets();
-    /* Set flag agar 1 sync pertama skip restore today tasks (hindari restore task kemarin) */
+    if(_archivedTaskIds.length>0) await apiPost({action:'bulkDeleteTasks', ids:_archivedTaskIds});
     _lsSave('si_today_reset_done', todayStr());
     if(sessionRestored && currentUser) await syncFromSheets();
-    /* Clear flag — sync selanjutnya kembali normal & task dari cabang bisa masuk */
     _lsSave('si_today_reset_done', '');
   }, 600);
 }
@@ -3279,51 +3367,42 @@ loadNotes();
 document.getElementById('fu-date').value=todayStr();
 if(sessionRestored){
   applyRoleUI();
-  /* Sync awal — tapi hanya kalau BUKAN hari reset (sudah ditangani di blok didReset di atas) */
   if(!didReset) setTimeout(syncFromSheets, 1500);
 }
 
-/* Auto-sync setiap 20 detik agar semua cabang selalu dapat data terbaru.
-   Safety: cek lock dan waktu mulai — kalau stuck > 30 detik akan auto-reset di dalam syncFromSheets. */
+/* Auto-sync setiap 45 detik */
 setInterval(()=>{
-  if(currentUser && SHEETS_URL){
-    syncFromSheets();
-  }
+  if(currentUser && SHEETS_URL) syncFromSheets();
 }, 45000);
 
-/* ── Midnight Reset: cek setiap menit apakah tanggal sudah berganti ──
-   Jika dashboard dibiarkan terbuka semalaman, ini yang memicu reset to-do saat jam 00:00.
-   Tanpa ini, reset hanya terjadi saat halaman di-refresh.
-
-   ALUR RESET:
-   1. checkDailyReset() → arsip skor kemarin, kosongkan today tasks di localStorage
-   2. pushAllTasksToSheets() → kirim today tasks KOSONG ke Sheets
-      (WAJIB: tanpa ini, syncFromSheets akan tarik task kemarin dari Sheets & undo reset!)
-   3. syncFromSheets() → tarik data terbaru (today tasks akan kosong/baru)
-   4. Re-render & notifikasi
-
-   Semua cabang yang masih buka akan ikut reset karena timer ini berjalan di setiap browser.
-   Cabang yang sedang tutup → reset saat dibuka keesokan harinya (existing behavior). */
+/* ── Midnight Reset: cek setiap menit apakah tanggal sudah berganti ── */
 let _lastDateCheck = todayStr();
 setInterval(()=>{
   const nowDate = todayStr();
   if(nowDate !== _lastDateCheck){
     _lastDateCheck = nowDate;
     console.log('[MidnightReset] Tanggal berganti →', nowDate);
-
-    /* Step 1: arsip skor + kosongkan today tasks di localStorage */
-    checkDailyReset();
-
-    /* Step 2: push today tasks KOSONG ke Sheets agar cabang lain tidak balik ke task kemarin */
-    if(SHEETS_URL){
-      pushAllTasksToSheets().then(async()=>{
-        /* Set flag agar 1 sync pertama skip restore (hindari task kemarin kembali) */
+    /* Step 1: arsip skor + kosongkan today tasks, ambil ID kemarin */
+    const _midnightArchivedIds = checkDailyReset();
+    /* Step 2: hapus task kemarin dari Sheets per ID */
+    if(SHEETS_URL && _midnightArchivedIds !== null){
+      (async()=>{
+        if(_midnightArchivedIds.length>0) await apiPost({action:'bulkDeleteTasks', ids:_midnightArchivedIds});
         _lsSave('si_today_reset_done', todayStr());
-        /* Step 3: sync ulang dari Sheets (today tasks sudah kosong) */
         if(currentUser && SHEETS_URL) await syncFromSheets();
-        /* Clear flag — sync selanjutnya normal; task baru dari cabang bisa masuk */
         _lsSave('si_today_reset_done', '');
-      });
+      })();
     }
-
-    /* Step 4: re-render & no
+    /* Step 3: re-render & notifikasi */
+    renderTasksSection('today','todo-divisions');
+    updateTodoSummary();
+    const n=document.createElement('div');
+    n.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:white;border-radius:12px;padding:12px 22px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.3)';
+    n.textContent='🌅 Tengah malam! Skor diarsip & to-do list baru siap untuk hari ini.';
+    document.body.appendChild(n);
+    setTimeout(()=>n.remove(), 6000);
+  }
+}, 60000);
+</script>
+</body>
+</html>
